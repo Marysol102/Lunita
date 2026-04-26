@@ -1,5 +1,49 @@
 <!DOCTYPE html>
 <html lang="es">
+  <link rel="apple-touch-icon" id="apple-icon"/>
+<script>
+  // Genera el icono con canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Fondo oscuro redondeado
+  ctx.fillStyle = '#0b0e18';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 512, 512, 100);
+  ctx.fill();
+
+  // Luna
+  ctx.font = '320px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🌙', 256, 270);
+
+  const iconUrl = canvas.toDataURL('image/png');
+
+  // Apple touch icon (iOS)
+  document.getElementById('apple-icon').href = iconUrl;
+
+  // Manifest (Android/Chrome)
+  const manifest = {
+    name: 'Lunita',
+    short_name: 'Lunita',
+    description: 'Herramientas para padres primerizos',
+    start_url: './',
+    display: 'standalone',
+    background_color: '#0b0e18',
+    theme_color: '#0b0e18',
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: 'image/png' },
+      { src: iconUrl, sizes: '512x512', type: 'image/png' }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = URL.createObjectURL(blob);
+  document.head.appendChild(link);
+</script>
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
