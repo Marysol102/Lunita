@@ -505,15 +505,51 @@ function EntryCard({ entry, onDelete, onFinalize }) {
 }
 
 // ─── REGISTRO VIEW ─────────────────────────────────────────────────────────────
+const getEntryDate = e => (e.type==="toma" && e.startDate) ? e.startDate : new Date(e.createdAt).toISOString().slice(0,10);
+
+const fmtDayLabel = dateStr => {
+  const t = todayStr();
+  const yest = new Date(); yest.setDate(yest.getDate()-1);
+  const y = yest.toISOString().slice(0,10);
+  if(dateStr===t) return "Hoy";
+  if(dateStr===y) return "Ayer";
+  const d = new Date(dateStr+"T12:00:00");
+  return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+};
+
+function DaySeparator({ label, tomas, panales }) {
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px 6px"}}>
+      <div style={{flex:1,height:1,backgroundColor:C.border}}/>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+        <span style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"capitalize"}}>{label}</span>
+        <span style={{fontSize:11,color:C.muted}}>·</span>
+        <span style={{fontSize:11,color:C.muted}}>🤱 {tomas}</span>
+        <span style={{fontSize:11,color:C.muted}}>🧷 {panales}</span>
+      </div>
+      <div style={{flex:1,height:1,backgroundColor:C.border}}/>
+    </div>
+  );
+}
+
 function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
-  const today=new Date().toDateString();
-  const todayE=entries.filter(e=>new Date(e.createdAt).toDateString()===today);
-  const enCurso=entries.filter(e=>e.status==="en_curso").length;
+  const enCurso = entries.filter(e=>e.status==="en_curso").length;
+
+  // Group entries by day (newest first)
+  const days = [...new Set(entries.map(getEntryDate))].sort((a,b)=>b.localeCompare(a));
+
+  // Top summary: most recent day with entries, or today
+  const topDay = days[0] || todayStr();
+  const topEntries = entries.filter(e=>getEntryDate(e)===topDay);
+  const topLabel = fmtDayLabel(topDay);
+
   return (
     <div>
       <div style={{padding:"16px 16px 10px"}}>
+        {/* Day label for summary */}
+        <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"capitalize",marginBottom:8,letterSpacing:0.5}}>{topLabel}</div>
         <div style={{display:"flex",gap:10,marginBottom:10}}>
-          {[{label:"Tomas hoy",value:todayE.filter(e=>e.type==="toma").length,emoji:"🤱"},{label:"Pañales hoy",value:todayE.filter(e=>e.type==="panal").length,emoji:"🧷"}].map(s=>(
+          {[{label:"Tomas",value:topEntries.filter(e=>e.type==="toma").length,emoji:"🤱"},{label:"Pañales",value:topEntries.filter(e=>e.type==="panal").length,emoji:"🧷"}].map(s=>(
             <div key={s.label} style={{flex:1,backgroundColor:C.surface,borderRadius:14,padding:"12px 14px",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:22}}>{s.emoji}</div>
               <div style={{fontSize:24,fontWeight:900,color:C.accent,lineHeight:1.1}}>{s.value}</div>
@@ -529,6 +565,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
           <span>⏱</span><span style={{fontSize:13,fontWeight:700,color:C.orange}}>{enCurso} toma{enCurso>1?"s":""} en curso — pulsa para añadir el fin</span>
         </div>}
       </div>
+
       {entries.length===0?(
         <div style={{textAlign:"center",padding:"50px 24px",color:C.muted}}>
           <div style={{fontSize:52,marginBottom:14}}>🌙</div>
@@ -536,7 +573,20 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
           <div style={{fontSize:13,marginTop:8,lineHeight:1.6}}>Pulsa <strong style={{color:C.accent}}>+</strong> para añadir la primera toma o cambio de pañal</div>
         </div>
       ):(
-        <div style={{paddingTop:4}}>{entries.map(e=><EntryCard key={e.id} entry={e} onDelete={onDelete} onFinalize={onFinalize}/>)}</div>
+        <div style={{paddingBottom:4}}>
+          {days.map((day, dayIdx) => {
+            const dayEntries = entries.filter(e=>getEntryDate(e)===day);
+            const tomas   = dayEntries.filter(e=>e.type==="toma").length;
+            const panales = dayEntries.filter(e=>e.type==="panal").length;
+            return (
+              <div key={day}>
+                {/* Separator for every day except the first (which is shown in the header) */}
+                {dayIdx > 0 && <DaySeparator label={fmtDayLabel(day)} tomas={tomas} panales={panales}/>}
+                {dayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={onDelete} onFinalize={onFinalize}/>)}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
