@@ -367,7 +367,8 @@ function AddEntryModal({ onSave, onClose }) {
   const T = text => <div style={{fontSize:19,fontWeight:900,marginBottom:22,color:C.text}}>{text}</div>;
 
   const saveComplete = () => {
-    if(s.type==="toma") onSave({type:"toma",status:"done",breast:s.breast,startDate:s.sd,startTime:s.st,endDate:s.ed,endTime:s.et,duration:dur,comment:s.comment});
+    if(s.type==="toma" && s.breast==="sacaleches") onSave({type:"toma",status:"done",breast:"sacaleches",ml:s.ml,comment:s.comment});
+    else if(s.type==="toma") onSave({type:"toma",status:"done",breast:s.breast,startDate:s.sd,startTime:s.st,endDate:s.ed,endTime:s.et,duration:dur,comment:s.comment});
     else onSave({type:"panal",diaperType:s.diaper,amount:s.amount,comment:s.comment});
     onClose();
   };
@@ -382,9 +383,32 @@ function AddEntryModal({ onSave, onClose }) {
 
   if(s.type==="toma"&&s.step===1) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
     {T("¿Qué pecho?")}
-    <button style={selBtn(s.breast==="left")}  onClick={()=>setS(p=>({...p,breast:"left", step:2}))}><span style={{fontSize:24}}>⬅️</span><div style={{fontWeight:800}}>Pecho izquierdo</div></button>
-    <button style={selBtn(s.breast==="right")} onClick={()=>setS(p=>({...p,breast:"right",step:2}))}><span style={{fontSize:24}}>➡️</span><div style={{fontWeight:800}}>Pecho derecho</div></button>
+    <button style={selBtn(s.breast==="left")}  onClick={()=>setS(p=>({...p,breast:"left", step:2}))}><span style={{fontSize:24}}>⬅️</span><div><div style={{fontWeight:800}}>Pecho izquierdo</div></div></button>
+    <button style={selBtn(s.breast==="right")} onClick={()=>setS(p=>({...p,breast:"right",step:2}))}><span style={{fontSize:24}}>➡️</span><div><div style={{fontWeight:800}}>Pecho derecho</div></div></button>
+    <button style={selBtn(s.breast==="sacaleches")} onClick={()=>setS(p=>({...p,breast:"sacaleches",step:20}))}><span style={{fontSize:24}}>🍼</span><div><div style={{fontWeight:800}}>Sacaleches</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
+  </div></div>);
+
+  if(s.type==="toma"&&s.step===20) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("🍼 ¿Cuánto sacaste?")}
+    <label style={UL}>Cantidad (ml)</label>
+    <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+      {[30,60,90,120,150,180].map(ml=>(
+        <button key={ml} onClick={()=>setS(p=>({...p,ml:String(ml)}))} style={{
+          padding:"10px 14px",borderRadius:10,border:`1px solid ${s.ml===String(ml)?C.accent:C.border}`,
+          backgroundColor:s.ml===String(ml)?C.accentDim:C.elevated,
+          color:s.ml===String(ml)?C.accent:C.text,fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"inherit"
+        }}>{ml}</button>
+      ))}
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+      <input type="number" min={0} max={999} placeholder="Otro…" value={s.ml||""} onChange={e=>setS(p=>({...p,ml:e.target.value}))}
+        style={{...tInput,flex:1,fontSize:22}} inputMode="numeric"/>
+      <span style={{fontSize:16,color:C.muted,fontWeight:700}}>ml</span>
+    </div>
+    <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
+    {s.ml&&Number(s.ml)>0&&<button style={primaryBtn} onClick={saveComplete}>💾 Guardar sacaleches</button>}
+    <button style={ghostBtn} onClick={()=>u("step",1)}>← Atrás</button>
   </div></div>);
 
   if(s.type==="toma"&&s.step===2) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
@@ -475,15 +499,35 @@ function FinalizeModal({ entry, onUpdate, onClose }) {
 }
 
 // ─── ENTRY CARD ────────────────────────────────────────────────────────────────
-function EntryCard({ entry, onDelete, onFinalize }) {
-  const ip=entry.type==="toma"&&entry.status==="en_curso";
-  const emoji=entry.type==="toma"?(entry.breast==="left"?"🤱":"🍼"):({pis:"💧",caca:"💩",mixto:"🌊"}[entry.diaperType]||"🧷");
-  const detail=entry.type==="toma"?`${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`:`${({pis:"Pipí",caca:"Caca",mixto:"Mixto"}[entry.diaperType])}${entry.amount?` · ${entry.amount}`:""}`;
-  const timeLabel=entry.type==="toma"&&entry.startTime?`${fmtDateTime(entry.startDate,entry.startTime)}${entry.endTime?` → ${fmtDateTime(entry.endDate,entry.endTime)}`:""}`
-    :fmtDateTime(todayStr(),new Date(entry.createdAt).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"}));
+function EntryCard({ entry, onDelete, onFinalize, dragHandleProps, isDragging }) {
+  const ip    = entry.type==="toma" && entry.status==="en_curso";
+  const isSacaleches = entry.type==="toma" && entry.breast==="sacaleches";
+  const isDraggable  = entry.type==="panal" || isSacaleches;
+  const emoji = entry.type==="toma"
+    ? (isSacaleches ? "🍼" : entry.breast==="left" ? "🤱" : "🍼")
+    : ({pis:"💧",caca:"💩",mixto:"🌊"}[entry.diaperType]||"🧷");
+  const detail = entry.type==="toma"
+    ? (isSacaleches ? `Sacaleches · ${entry.ml||"?"}ml` : `${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`)
+    : `${({pis:"Pipí",caca:"Caca",mixto:"Mixto"}[entry.diaperType])}${entry.amount?` · ${entry.amount}`:""}`;
+  // Tomas show time — pañales and sacaleches do NOT
+  const timeLabel = entry.type==="toma" && !isSacaleches && entry.startTime
+    ? `${fmtDateTime(entry.startDate,entry.startTime)}${entry.endTime?` → ${fmtDateTime(entry.endDate,entry.endTime)}`:""}`
+    : null;
+
   return (
-    <div style={{backgroundColor:C.surface,borderRadius:14,padding:"13px 14px",margin:"0 14px 10px",border:`1px solid ${ip?C.orange:C.border}`}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
+    <div style={{
+      backgroundColor:C.surface, borderRadius:14, padding:"13px 14px",
+      margin:"0 14px 10px", border:`1px solid ${ip?C.orange:C.border}`,
+      opacity: isDragging ? 0.3 : 1, transition:"opacity 0.15s",
+    }}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        {isDraggable && (
+          <div {...dragHandleProps} style={{
+            flexShrink:0, touchAction:"none", cursor:"grab",
+            color:C.muted, fontSize:20, padding:"4px 2px 4px 0",
+            userSelect:"none", lineHeight:1,
+          }}>⠿</div>
+        )}
         <div style={{position:"relative",flexShrink:0}}>
           <div style={{fontSize:26,width:38,textAlign:"center"}}>{emoji}</div>
           {ip&&<div style={{position:"absolute",top:-2,right:-2,width:10,height:10,borderRadius:5,backgroundColor:C.orange,animation:"pulse 1.5s ease-in-out infinite"}}/>}
@@ -492,7 +536,7 @@ function EntryCard({ entry, onDelete, onFinalize }) {
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:14,fontWeight:800}}>{entry.type==="toma"?"Toma":"Pañal"}</span>
             {ip&&<span style={{fontSize:10,fontWeight:800,color:C.orange,backgroundColor:hexA(C.orange,0.15),padding:"2px 7px",borderRadius:6}}>EN CURSO</span>}
-            <span style={{fontSize:12,color:C.muted}}>{timeLabel}</span>
+            {timeLabel&&<span style={{fontSize:12,color:C.muted}}>{timeLabel}</span>}
           </div>
           <div style={{fontSize:12,color:C.muted,marginTop:3}}>{detail}</div>
           {entry.comment&&<div style={{fontSize:12,color:C.blue,marginTop:5,fontStyle:"italic"}}>💬 {entry.comment}</div>}
@@ -532,22 +576,103 @@ function DaySeparator({ label, tomas, panales }) {
   );
 }
 
-function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
+function DropLine() {
+  return <div style={{height:3,backgroundColor:C.orange,margin:"0 14px 2px",borderRadius:2,opacity:0.9}}/>;
+}
+
+function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReorder }) {
   const enCurso = entries.filter(e=>e.status==="en_curso").length;
-
-  // Group entries by day (newest first)
-  const days = [...new Set(entries.map(getEntryDate))].sort((a,b)=>b.localeCompare(a));
-
-  // Top summary: most recent day with entries, or today
-  const topDay = days[0] || todayStr();
+  const days    = [...new Set(entries.map(getEntryDate))].sort((a,b)=>b.localeCompare(a));
+  const topDay  = days[0] || todayStr();
   const topEntries = entries.filter(e=>getEntryDate(e)===topDay);
-  const topLabel = fmtDayLabel(topDay);
+
+  // ── Drag state ──
+  const [dragId,  setDragId]  = useState(null);  // id of entry being dragged
+  const [dropIdx, setDropIdx] = useState(null);  // insert position in flat entries array
+  const [ghostY,  setGhostY]  = useState(0);
+  const [ghostH,  setGhostH]  = useState(60);
+  const [ghostLabel, setGhostLabel] = useState("");
+  const itemRefs    = useRef({});
+  const longPressRef = useRef(null);
+  const offsetYRef  = useRef(0);
+
+  const startLongPress = (e, entry) => {
+    if(entry.type !== "panal" && entry.breast !== "sacaleches") return;
+    const touch = e.touches[0];
+    longPressRef.current = setTimeout(() => {
+      navigator.vibrate?.(30);
+      const el = itemRefs.current[entry.id];
+      if(!el) return;
+      const rect = el.getBoundingClientRect();
+      offsetYRef.current = touch.clientY - rect.top;
+      setGhostY(rect.top);
+      setGhostH(rect.height);
+      setGhostLabel(entry.breast==="sacaleches" ? `🍼 Sacaleches · ${entry.ml||"?"}ml` : `${({pis:"💧 Pipí",caca:"💩 Caca",mixto:"🌊 Mixto"})[entry.diaperType]}${entry.amount?" · "+entry.amount:""}`);
+      setDragId(entry.id);
+      setDropIdx(entries.findIndex(en=>en.id===entry.id));
+    }, 380);
+  };
+
+  const cancelLong = () => clearTimeout(longPressRef.current);
+
+  // Global touch handlers while dragging
+  useEffect(() => {
+    if(!dragId) return;
+    const onMove = e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      setGhostY(touch.clientY - offsetYRef.current);
+      // Find which slot the finger is over
+      let newDrop = entries.length;
+      for(let i=0; i<entries.length; i++) {
+        const el = itemRefs.current[entries[i].id];
+        if(!el) continue;
+        const rect = el.getBoundingClientRect();
+        if(touch.clientY < rect.top + rect.height/2) { newDrop = i; break; }
+      }
+      setDropIdx(newDrop);
+    };
+    const onEnd = () => {
+      const fromIdx = entries.findIndex(e=>e.id===dragId);
+      if(fromIdx !== -1 && dropIdx !== null) {
+        let insertAt = dropIdx > fromIdx ? dropIdx - 1 : dropIdx;
+        if(insertAt !== fromIdx) {
+          const ne = [...entries];
+          const [item] = ne.splice(fromIdx, 1);
+          ne.splice(insertAt, 0, item);
+          onReorder(ne);
+        }
+      }
+      setDragId(null); setDropIdx(null);
+    };
+    document.addEventListener("touchmove", onMove, {passive:false});
+    document.addEventListener("touchend",  onEnd);
+    document.addEventListener("touchcancel", onEnd);
+    return () => {
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend",  onEnd);
+      document.removeEventListener("touchcancel", onEnd);
+    };
+  }, [dragId, dropIdx, entries]);
 
   return (
     <div>
+      {/* Ghost element */}
+      {dragId && (
+        <div style={{
+          position:"fixed", left:14, right:14, top:ghostY, zIndex:500,
+          height:ghostH, backgroundColor:C.elevated, borderRadius:14,
+          border:`2px solid ${C.orange}`, display:"flex", alignItems:"center",
+          padding:"0 16px", gap:10, pointerEvents:"none",
+          boxShadow:`0 8px 32px rgba(0,0,0,0.5)`,
+        }}>
+          <span style={{fontSize:20}}>{ghostLabel.startsWith("🍼")?"🍼":"🧷"}</span>
+          <span style={{fontSize:14,fontWeight:800,color:C.text}}>{ghostLabel.replace(/^[🍼🧷]\s*/,"")}</span>
+        </div>
+      )}
+
       <div style={{padding:"16px 16px 10px"}}>
-        {/* Day label for summary */}
-        <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"capitalize",marginBottom:8,letterSpacing:0.5}}>{topLabel}</div>
+        <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"capitalize",marginBottom:8,letterSpacing:0.5}}>{fmtDayLabel(topDay)}</div>
         <div style={{display:"flex",gap:10,marginBottom:10}}>
           {[{label:"Tomas",value:topEntries.filter(e=>e.type==="toma").length,emoji:"🤱"},{label:"Pañales",value:topEntries.filter(e=>e.type==="panal").length,emoji:"🧷"}].map(s=>(
             <div key={s.label} style={{flex:1,backgroundColor:C.surface,borderRadius:14,padding:"12px 14px",border:`1px solid ${C.border}`}}>
@@ -564,6 +689,11 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
         {enCurso>0&&<div style={{backgroundColor:hexA(C.orange,0.1),borderRadius:12,padding:"10px 14px",border:`1px solid ${hexA(C.orange,0.4)}`,display:"flex",alignItems:"center",gap:8}}>
           <span>⏱</span><span style={{fontSize:13,fontWeight:700,color:C.orange}}>{enCurso} toma{enCurso>1?"s":""} en curso — pulsa para añadir el fin</span>
         </div>}
+        {entries.some(e=>e.type==="panal") && !dragId && (
+          <div style={{fontSize:11,color:C.muted,marginTop:10,textAlign:"center"}}>
+            Mantén pulsado <strong style={{color:C.text}}>⠿</strong> en un pañal o sacaleches para reordenarlo
+          </div>
+        )}
       </div>
 
       {entries.length===0?(
@@ -574,18 +704,40 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport }) {
         </div>
       ):(
         <div style={{paddingBottom:4}}>
-          {days.map((day, dayIdx) => {
-            const dayEntries = entries.filter(e=>getEntryDate(e)===day);
-            const tomas   = dayEntries.filter(e=>e.type==="toma").length;
-            const panales = dayEntries.filter(e=>e.type==="panal").length;
-            return (
-              <div key={day}>
-                {/* Separator for every day except the first (which is shown in the header) */}
-                {dayIdx > 0 && <DaySeparator label={fmtDayLabel(day)} tomas={tomas} panales={panales}/>}
-                {dayEntries.map(e=><EntryCard key={e.id} entry={e} onDelete={onDelete} onFinalize={onFinalize}/>)}
-              </div>
-            );
-          })}
+          {/* Flat list with day separators and drop indicators */}
+          {(() => {
+            const items = [];
+            let lastDay = null;
+            entries.forEach((e, flatIdx) => {
+              const eDay = getEntryDate(e);
+              // Drop indicator before this item
+              if(dragId && dropIdx === flatIdx) items.push(<DropLine key={`drop-${flatIdx}`}/>);
+              // Day separator
+              if(eDay !== lastDay && lastDay !== null) {
+                const dEntries = entries.filter(en=>getEntryDate(en)===eDay);
+                items.push(<DaySeparator key={`sep-${eDay}`} label={fmtDayLabel(eDay)} tomas={dEntries.filter(en=>en.type==="toma").length} panales={dEntries.filter(en=>en.type==="panal").length}/>);
+              }
+              lastDay = eDay;
+              items.push(
+                <div key={e.id} ref={el=>{ if(el) itemRefs.current[e.id]=el; else delete itemRefs.current[e.id]; }}>
+                  <EntryCard
+                    entry={e}
+                    onDelete={onDelete}
+                    onFinalize={onFinalize}
+                    isDragging={dragId===e.id}
+                    dragHandleProps={(e.type==="panal"||(e.type==="toma"&&e.breast==="sacaleches")) ? {
+                      onTouchStart: ev => startLongPress(ev, e),
+                      onTouchMove:  cancelLong,
+                      onTouchEnd:   cancelLong,
+                    } : {}}
+                  />
+                </div>
+              );
+            });
+            // Drop indicator at end
+            if(dragId && dropIdx === entries.length) items.push(<DropLine key="drop-end"/>);
+            return items;
+          })()}
         </div>
       )}
     </div>
@@ -743,7 +895,7 @@ function App() {
       </div>
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:72}}>
-        {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)}/>}
+        {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)} onReorder={persist}/>}
         {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
         {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol}/>}
       </div>
