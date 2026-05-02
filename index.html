@@ -367,7 +367,8 @@ function AddEntryModal({ onSave, onClose }) {
   const T = text => <div style={{fontSize:19,fontWeight:900,marginBottom:22,color:C.text}}>{text}</div>;
 
   const saveComplete = () => {
-    if(s.type==="toma" && s.breast==="sacaleches") onSave({type:"toma",status:"done",breast:"sacaleches",ml:s.ml,comment:s.comment});
+    if(s.type==="toma" && s.breast==="jeringa-dedo") onSave({type:"toma",status:"done",breast:"jeringa-dedo",ml:s.ml,comment:s.comment});
+    else if(s.type==="toma" && s.breast==="extraccion") onSave({type:"toma",status:"done",breast:"extraccion",extBreast:s.extBreast,startDate:s.sd,startTime:s.st,ml:s.ml,comment:s.comment});
     else if(s.type==="toma") onSave({type:"toma",status:"done",breast:s.breast,startDate:s.sd,startTime:s.st,endDate:s.ed,endTime:s.et,duration:dur,comment:s.comment});
     else onSave({type:"panal",diaperType:s.diaper,amount:s.amount,comment:s.comment});
     onClose();
@@ -376,7 +377,9 @@ function AddEntryModal({ onSave, onClose }) {
 
   if(s.step===0) return (<div style={OVERLAY} onClick={onClose}><div className="sheet" style={SHEET} onClick={e=>e.stopPropagation()}>
     {T("¿Qué vas a registrar?")}
-    <button style={bigBtn} onClick={()=>u("step",1)||setS(p=>({...p,type:"toma",step:1}))}><span style={{fontSize:26}}>🤱</span><div><div style={{fontWeight:800,fontSize:16}}>Toma de pecho</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Lactancia o biberón</div></div></button>
+    <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",step:1}))}><span style={{fontSize:26}}>🤱</span><div><div style={{fontWeight:800,fontSize:16}}>Toma de pecho</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Lactancia o biberón</div></div></button>
+    <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"extraccion",step:21}))}><span style={{fontSize:26}}>🥛</span><div><div style={{fontWeight:800,fontSize:16}}>Extracción con sacaleches</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Teta, fecha/hora y ml</div></div></button>
+    <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"jeringa-dedo",step:20}))}><span style={{fontSize:26}}>🍼</span><div><div style={{fontWeight:800,fontSize:16}}>Jeringa-dedo</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"panal",step:10}))}><span style={{fontSize:26}}>🧷</span><div><div style={{fontWeight:800,fontSize:16}}>Cambio de pañal</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar tipo y cantidad</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
   </div></div>);
@@ -385,7 +388,7 @@ function AddEntryModal({ onSave, onClose }) {
     {T("¿Qué pecho?")}
     <button style={selBtn(s.breast==="left")}  onClick={()=>setS(p=>({...p,breast:"left", step:2}))}><span style={{fontSize:24}}>⬅️</span><div><div style={{fontWeight:800}}>Pecho izquierdo</div></div></button>
     <button style={selBtn(s.breast==="right")} onClick={()=>setS(p=>({...p,breast:"right",step:2}))}><span style={{fontSize:24}}>➡️</span><div><div style={{fontWeight:800}}>Pecho derecho</div></div></button>
-    <button style={selBtn(s.breast==="sacaleches")} onClick={()=>setS(p=>({...p,breast:"sacaleches",step:20}))}><span style={{fontSize:24}}>🍼</span><div><div style={{fontWeight:800}}>Sacaleches</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
+    <button style={selBtn(s.breast==="jeringa-dedo")} onClick={()=>setS(p=>({...p,breast:"jeringa-dedo",step:20}))}><span style={{fontSize:24}}>🍼</span><div><div style={{fontWeight:800}}>Jeringa-dedo</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
   </div></div>);
 
@@ -407,7 +410,7 @@ function AddEntryModal({ onSave, onClose }) {
       <span style={{fontSize:16,color:C.muted,fontWeight:700}}>ml</span>
     </div>
     <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
-    {s.ml&&Number(s.ml)>0&&<button style={primaryBtn} onClick={saveComplete}>💾 Guardar sacaleches</button>}
+    {s.ml&&Number(s.ml)>0&&<button style={primaryBtn} onClick={saveComplete}>💾 Guardar jeringa-dedo</button>}
     <button style={ghostBtn} onClick={()=>u("step",1)}>← Atrás</button>
   </div></div>);
 
@@ -443,6 +446,51 @@ function AddEntryModal({ onSave, onClose }) {
     <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
     <button style={primaryBtn} onClick={saveComplete}>💾 Guardar toma</button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
+  </div></div>);
+
+  if(s.type==="toma"&&s.step===21) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("🥛 Extracción — ¿qué teta?")}
+    <button style={selBtn(s.extBreast==="left")}  onClick={()=>setS(p=>({...p,extBreast:"left", step:22}))}><span style={{fontSize:24}}>⬅️</span><div style={{fontWeight:800}}>Teta izquierda</div></button>
+    <button style={selBtn(s.extBreast==="right")} onClick={()=>setS(p=>({...p,extBreast:"right",step:22}))}><span style={{fontSize:24}}>➡️</span><div style={{fontWeight:800}}>Teta derecha</div></button>
+    <button style={ghostBtn} onClick={()=>u("step",1)}>← Atrás</button>
+  </div></div>);
+
+  if(s.type==="toma"&&s.step===22) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("🥛 Extracción — fecha y hora")}
+    <div style={{backgroundColor:C.elevated,borderRadius:12,padding:"10px 14px",marginBottom:16,border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:11,color:C.muted}}>Teta</div>
+      <div style={{fontWeight:800,fontSize:14}}>{s.extBreast==="left"?"⬅️ Izquierda":"➡️ Derecha"}</div>
+    </div>
+    <button style={nowBtn} onClick={()=>setS(p=>({...p,sd:todayStr(),st:nowTimeStr(),step:23}))}><span style={{fontSize:20}}>🕐</span><div><div style={{fontWeight:800}}>¿Es ahora?</div><div style={{fontSize:12,fontWeight:400}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</div></div></button>
+    <div style={{margin:"16px 0 0"}}><DTPicker label="O elige fecha y hora" date={s.sd} time={s.st} onDate={v=>u("sd",v)} onTime={v=>u("st",v)}/></div>
+    {s.st&&<button style={primaryBtn} onClick={()=>u("step",23)}>Siguiente →</button>}
+    <button style={ghostBtn} onClick={()=>u("step",21)}>← Atrás</button>
+  </div></div>);
+
+  if(s.type==="toma"&&s.step===23) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("🥛 ¿Cuánto sacaste?")}
+    <div style={{backgroundColor:C.elevated,borderRadius:12,padding:"10px 14px",marginBottom:16,border:`1px solid ${C.border}`,display:"flex",gap:20}}>
+      <div><div style={{fontSize:11,color:C.muted}}>Teta</div><div style={{fontWeight:800,fontSize:14}}>{s.extBreast==="left"?"⬅️ Izq":"➡️ Dch"}</div></div>
+      <div><div style={{fontSize:11,color:C.muted}}>Hora</div><div style={{fontWeight:800,fontSize:14,color:C.accent}}>{fmtDateTime(s.sd,s.st)}</div></div>
+    </div>
+    <label style={UL}>Cantidad (ml)</label>
+    <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+      {[30,60,90,120,150,180].map(ml=>(
+        <button key={ml} onClick={()=>setS(p=>({...p,ml:String(ml)}))} style={{
+          padding:"10px 14px",borderRadius:10,border:`1px solid ${s.ml===String(ml)?C.accent:C.border}`,
+          backgroundColor:s.ml===String(ml)?C.accentDim:C.elevated,
+          color:s.ml===String(ml)?C.accent:C.text,fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:"inherit"
+        }}>{ml}</button>
+      ))}
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+      <input type="number" min={0} max={999} placeholder="Otro…" value={s.ml||""} onChange={e=>setS(p=>({...p,ml:e.target.value}))}
+        style={{...tInput,flex:1,fontSize:22}} inputMode="numeric"/>
+      <span style={{fontSize:16,color:C.muted,fontWeight:700}}>ml</span>
+    </div>
+    <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
+    {s.ml&&Number(s.ml)>0&&<button style={primaryBtn} onClick={saveComplete}>💾 Guardar extracción</button>}
+    <button style={ghostBtn} onClick={()=>u("step",22)}>← Atrás</button>
   </div></div>);
 
   if(s.type==="panal"&&s.step===10) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
@@ -501,17 +549,20 @@ function FinalizeModal({ entry, onUpdate, onClose }) {
 // ─── ENTRY CARD ────────────────────────────────────────────────────────────────
 function EntryCard({ entry, onDelete, onFinalize, dragHandleProps, isDragging }) {
   const ip    = entry.type==="toma" && entry.status==="en_curso";
-  const isSacaleches = entry.type==="toma" && entry.breast==="sacaleches";
-  const isDraggable  = entry.type==="panal" || isSacaleches;
+  const isJeringa    = entry.type==="toma" && entry.breast==="jeringa-dedo";
+  const isExtraccion = entry.type==="toma" && entry.breast==="extraccion";
+  const isDraggable  = entry.type==="panal" || isJeringa || isExtraccion;
   const emoji = entry.type==="toma"
-    ? (isSacaleches ? "🍼" : entry.breast==="left" ? "🤱" : "🍼")
+    ? (isJeringa ? "🍼" : isExtraccion ? "🥛" : entry.breast==="left" ? "🤱" : "🍼")
     : ({pis:"💧",caca:"💩",mixto:"🌊"}[entry.diaperType]||"🧷");
   const detail = entry.type==="toma"
-    ? (isSacaleches ? `Sacaleches · ${entry.ml||"?"}ml` : `${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`)
+    ? (isJeringa    ? `Jeringa-dedo · ${entry.ml||"?"}ml`
+     : isExtraccion ? `Sacaleches ${entry.extBreast==="left"?"izq.":"dch."} · ${entry.ml||"?"}ml`
+     : `${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`)
     : `${({pis:"Pipí",caca:"Caca",mixto:"Mixto"}[entry.diaperType])}${entry.amount?` · ${entry.amount}`:""}`;
-  // Tomas show time — pañales and sacaleches do NOT
-  const timeLabel = entry.type==="toma" && !isSacaleches && entry.startTime
+  const timeLabel = entry.type==="toma" && !isJeringa && !isExtraccion && entry.startTime
     ? `${fmtDateTime(entry.startDate,entry.startTime)}${entry.endTime?` → ${fmtDateTime(entry.endDate,entry.endTime)}`:""}`
+    : isExtraccion && entry.startTime ? fmtDateTime(entry.startDate, entry.startTime)
     : null;
 
   return (
@@ -597,7 +648,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
   const offsetYRef  = useRef(0);
 
   const startLongPress = (e, entry) => {
-    if(entry.type !== "panal" && entry.breast !== "sacaleches") return;
+    if(entry.type !== "panal" && entry.breast !== "jeringa-dedo" && entry.breast !== "extraccion") return;
     const touch = e.touches[0];
     longPressRef.current = setTimeout(() => {
       navigator.vibrate?.(30);
@@ -607,7 +658,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
       offsetYRef.current = touch.clientY - rect.top;
       setGhostY(rect.top);
       setGhostH(rect.height);
-      setGhostLabel(entry.breast==="sacaleches" ? `🍼 Sacaleches · ${entry.ml||"?"}ml` : `${({pis:"💧 Pipí",caca:"💩 Caca",mixto:"🌊 Mixto"})[entry.diaperType]}${entry.amount?" · "+entry.amount:""}`);
+      setGhostLabel(entry.breast==="jeringa-dedo" ? `🍼 Jeringa-dedo · ${entry.ml||"?"}ml` : entry.breast==="extraccion" ? `🥛 Sacaleches ${entry.extBreast==="left"?"izq.":"dch."} · ${entry.ml||"?"}ml` : `${({pis:"💧 Pipí",caca:"💩 Caca",mixto:"🌊 Mixto"})[entry.diaperType]}${entry.amount?" · "+entry.amount:""}`);
       setDragId(entry.id);
       setDropIdx(entries.findIndex(en=>en.id===entry.id));
     }, 380);
@@ -666,7 +717,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
           padding:"0 16px", gap:10, pointerEvents:"none",
           boxShadow:`0 8px 32px rgba(0,0,0,0.5)`,
         }}>
-          <span style={{fontSize:20}}>{ghostLabel.startsWith("🍼")?"🍼":"🧷"}</span>
+          <span style={{fontSize:20}}>{ghostLabel.startsWith("🍼")?"🍼":ghostLabel.startsWith("🥛")?"🥛":"🧷"}</span>
           <span style={{fontSize:14,fontWeight:800,color:C.text}}>{ghostLabel.replace(/^[🍼🧷]\s*/,"")}</span>
         </div>
       )}
@@ -691,7 +742,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
         </div>}
         {entries.some(e=>e.type==="panal") && !dragId && (
           <div style={{fontSize:11,color:C.muted,marginTop:10,textAlign:"center"}}>
-            Mantén pulsado <strong style={{color:C.text}}>⠿</strong> en un pañal o sacaleches para reordenarlo
+            Mantén pulsado <strong style={{color:C.text}}>⠿</strong> en un pañal o jeringa-dedo para reordenarlo
           </div>
         )}
       </div>
@@ -725,7 +776,7 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
                     onDelete={onDelete}
                     onFinalize={onFinalize}
                     isDragging={dragId===e.id}
-                    dragHandleProps={(e.type==="panal"||(e.type==="toma"&&e.breast==="sacaleches")) ? {
+                    dragHandleProps={(e.type==="panal"||(e.type==="toma"&&(e.breast==="jeringa-dedo"||e.breast==="extraccion"))) ? {
                       onTouchStart: ev => startLongPress(ev, e),
                       onTouchMove:  cancelLong,
                       onTouchEnd:   cancelLong,
