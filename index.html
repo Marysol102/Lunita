@@ -848,6 +848,168 @@ function RegistroView({ entries, onDelete, onFinalize, onExport, onImport, onReo
   );
 }
 
+// ─── STATS MODAL ───────────────────────────────────────────────────────────────
+function StatsModal({ entries, onClose }) {
+  const [days, setDays] = useState(7);
+
+  // Build last N days array
+  const dateRange = Array.from({length:days}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate() - (days-1-i));
+    return d.toISOString().slice(0,10);
+  });
+
+  const dataByDay = dateRange.map(date => {
+    const de = entries.filter(e => {
+      const ed = e.startDate || new Date(e.createdAt).toISOString().slice(0,10);
+      return ed === date;
+    });
+    return {
+      date,
+      tomas:    de.filter(e=>e.type==="toma"&&e.breast!=="jeringa-dedo"&&e.breast!=="extraccion").length,
+      biberones:de.filter(e=>e.breast==="jeringa-dedo").length,
+      panales:  de.filter(e=>e.type==="panal").length,
+    };
+  });
+
+  const maxVal = Math.max(1, ...dataByDay.map(d=>Math.max(d.tomas,d.biberones,d.panales)));
+
+  // SVG chart dimensions
+  const W=340, H=180, padL=28, padB=30, padT=10, padR=10;
+  const chartW=W-padL-padR, chartH=H-padB-padT;
+  const barGroup=chartW/days, barW=Math.max(4,Math.floor(barGroup/5)), gap=1;
+
+  const BAR_COLORS = { tomas:"#f5a623", biberones:"#62a8f5", panales:"#4ade80" };
+
+  const fmtAxisDate = dateStr => {
+    const d = new Date(dateStr+"T12:00:00");
+    return `${d.getDate()}/${d.getMonth()+1}`;
+  };
+
+  // Totals for the period
+  const totals = dataByDay.reduce((acc,d)=>({
+    tomas:acc.tomas+d.tomas, biberones:acc.biberones+d.biberones, panales:acc.panales+d.panales
+  }), {tomas:0,biberones:0,panales:0});
+
+  const yLines = [0.25,0.5,0.75,1.0];
+
+  return (
+    <div style={{position:"fixed",inset:0,backgroundColor:"rgba(0,0,0,0.9)",zIndex:400,display:"flex",flexDirection:"column",fontFamily:"'Nunito',system-ui,sans-serif",color:C.text,overflowY:"auto"}}>
+
+      {/* Header */}
+      <div style={{padding:"calc(env(safe-area-inset-top,0px)+14px) 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:900}}>📊 Estadísticas</div>
+          <div style={{fontSize:11,color:C.muted}}>Resumen de registros</div>
+        </div>
+        <button onClick={onClose} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 14px",color:C.muted,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>Cerrar</button>
+      </div>
+
+      <div style={{padding:16,flex:1}}>
+
+        {/* Range selector */}
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          {[7,14,30].map(d=>(
+            <button key={d} onClick={()=>setDays(d)} style={{
+              flex:1,padding:"8px",borderRadius:10,border:`1px solid ${days===d?C.accent:C.border}`,
+              backgroundColor:days===d?C.accentDim:C.surface,color:days===d?C.accent:C.muted,
+              fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:"inherit"
+            }}>{d===7?"7 días":d===14?"14 días":"30 días"}</button>
+          ))}
+        </div>
+
+        {/* SVG Chart */}
+        <div style={{backgroundColor:C.surface,borderRadius:16,padding:"16px 8px 8px",marginBottom:16,border:`1px solid ${C.border}`,overflowX:"auto"}}>
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block",minWidth:Math.max(300,days*22)}}>
+            {/* Y grid lines */}
+            {yLines.map(f=>{
+              const y = padT + chartH*(1-f);
+              const val = Math.round(maxVal*f);
+              return (
+                <g key={f}>
+                  <line x1={padL} y1={y} x2={W-padR} y2={y} stroke={C.border} strokeWidth="1"/>
+                  <text x={padL-4} y={y+4} textAnchor="end" fontSize="9" fill={C.muted}>{val}</text>
+                </g>
+              );
+            })}
+
+            {/* Bars */}
+            {dataByDay.map((d,i)=>{
+              const cx = padL + i*barGroup + barGroup/2;
+              const bars = [
+                {key:"tomas",    val:d.tomas,     color:BAR_COLORS.tomas},
+                {key:"biberones",val:d.biberones,  color:BAR_COLORS.biberones},
+                {key:"panales",  val:d.panales,    color:BAR_COLORS.panales},
+              ];
+              const totalBarsW = bars.length*(barW+gap)-gap;
+              return (
+                <g key={d.date}>
+                  {bars.map((b,bi)=>{
+                    const bh = b.val===0 ? 0 : Math.max(4, (b.val/maxVal)*chartH);
+                    const bx = cx - totalBarsW/2 + bi*(barW+gap);
+                    const by = padT + chartH - bh;
+                    return (
+                      <g key={b.key}>
+                        <rect x={bx} y={by} width={barW} height={bh} rx="2" fill={b.color} opacity="0.85"/>
+                        {b.val>0&&bh>12&&<text x={bx+barW/2} y={by-2} textAnchor="middle" fontSize="8" fill={b.color} fontWeight="bold">{b.val}</text>}
+                      </g>
+                    );
+                  })}
+                  {/* X label */}
+                  <text x={cx} y={H-4} textAnchor="middle" fontSize="8" fill={C.muted}>{fmtAxisDate(d.date)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* Legend */}
+        <div style={{display:"flex",justifyContent:"center",gap:20,marginBottom:20}}>
+          {[{label:"Tomas",color:BAR_COLORS.tomas,emoji:"🤱"},{label:"Biberón",color:BAR_COLORS.biberones,emoji:"🍼"},{label:"Pañales",color:BAR_COLORS.panales,emoji:"🧷"}].map(l=>(
+            <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:10,height:10,borderRadius:2,backgroundColor:l.color}}/>
+              <span style={{fontSize:11,color:C.muted}}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Totals */}
+        <div style={{fontSize:12,fontWeight:800,color:C.muted,letterSpacing:0.5,textTransform:"uppercase",marginBottom:10}}>
+          Total últimos {days} días
+        </div>
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          {[
+            {label:"Tomas",    value:totals.tomas,     emoji:"🤱", color:BAR_COLORS.tomas},
+            {label:"Biberones",value:totals.biberones,  emoji:"🍼", color:BAR_COLORS.biberones},
+            {label:"Pañales",  value:totals.panales,    emoji:"🧷", color:BAR_COLORS.panales},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,backgroundColor:C.surface,borderRadius:14,padding:"12px 10px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:20}}>{s.emoji}</div>
+              <div style={{fontSize:22,fontWeight:900,color:s.color,lineHeight:1.1}}>{s.value}</div>
+              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily averages */}
+        <div style={{backgroundColor:C.surface,borderRadius:14,padding:"12px 16px",border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Media diaria</div>
+          {[
+            {label:"Tomas",    value:(totals.tomas/days).toFixed(1),    emoji:"🤱"},
+            {label:"Biberones",value:(totals.biberones/days).toFixed(1), emoji:"🍼"},
+            {label:"Pañales",  value:(totals.panales/days).toFixed(1),   emoji:"🧷"},
+          ].map(s=>(
+            <div key={s.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:13,color:C.muted}}>{s.emoji} {s.label}</span>
+              <span style={{fontSize:15,fontWeight:800,color:C.text}}>{s.value} / día</span>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── LINTERNA VIEW ─────────────────────────────────────────────────────────────
 function LinternaView({ color, setColor, brightness, setBrightness, active, setActive }) {
   return (
@@ -944,6 +1106,7 @@ function App() {
   const [finalEntry,setFinal]  = useState(null);
   const [showSala,setShowSala] = useState(false);
   const [showImport,setShowImport] = useState(false);
+  const [showStats, setShowStats]   = useState(false);
   const [lightColor,setLC]     = useState(LIGHT_COLORS[0]);
   const [brightness,setBr]     = useState(0.65);
   const [lightActive,setLA]    = useState(false);
@@ -1024,11 +1187,16 @@ function App() {
             <div style={{fontSize:11,color:C.muted}}>{isSala?`Sala de ${setup.babyName}`:"Modo local"}</div>
           </div>
         </div>
-        {isSala&&(
-          <button onClick={()=>setShowSala(true)} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 12px",color:C.accent,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-            👨‍👩‍👧 {setup.roomCode}
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>setShowStats(true)} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 12px",color:C.muted,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+            📊
           </button>
-        )}
+          {isSala&&(
+            <button onClick={()=>setShowSala(true)} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 12px",color:C.accent,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              👨‍👩‍👧 {setup.roomCode}
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:72}}>
@@ -1053,7 +1221,8 @@ function App() {
       {modal      &&<AddEntryModal onSave={addEntry}  onClose={()=>setModal(false)}/>}
       {finalEntry &&<FinalizeModal entry={finalEntry} onUpdate={updateEntry} onClose={()=>setFinal(null)}/>}
       {showSala   &&<SalaInfoModal setup={setup} onClose={()=>setShowSala(false)} onLeave={handleLeaveSala}/>}
-      {showImport &&<ImportModal onImport={handleImport} onClose={()=>setShowImport(false)}/>}
+      {showImport &&<ImportModal onImport={handleImport} onClose={()=>setShowImport(false)}/>
+      }{showStats   &&<StatsModal entries={entries} onClose={()=>setShowStats(false)}/>}
     </div>
   );
 }
