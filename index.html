@@ -51,6 +51,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 
 <script>
 firebase.initializeApp({
@@ -61,7 +62,8 @@ firebase.initializeApp({
   messagingSenderId: "958984288633",
   appId:             "1:958984288633:web:c88980de5de0a5422597a8"
 });
-const db = firebase.firestore();
+const db      = firebase.firestore();
+const storage = firebase.storage();
 </script>
 
 <script type="text/babel">
@@ -1010,6 +1012,267 @@ function StatsModal({ entries, onClose }) {
   );
 }
 
+// ─── LLANTO VIEW ───────────────────────────────────────────────────────────────
+const CAUSAS = [
+  {id:"hambre",    label:"Hambre",           emoji:"🍼", color:"#f5a623"},
+  {id:"sueno",     label:"Sueño",            emoji:"😴", color:"#62a8f5"},
+  {id:"gases",     label:"Gases",            emoji:"💨", color:"#4ade80"},
+  {id:"dolor",     label:"Dolor",            emoji:"😣", color:"#f87171"},
+  {id:"panal",     label:"Pañal",            emoji:"🧷", color:"#c084fc"},
+  {id:"calor",     label:"Calor/frío",       emoji:"🌡️", color:"#fb923c"},
+  {id:"estimulo",  label:"Sobre-estimulado", emoji:"😵", color:"#f472b6"},
+  {id:"otro",      label:"Otro",             emoji:"❓", color:"#7b82a0"},
+];
+
+// Upload audio blob to Firebase Storage, save metadata to Firestore
+const uploadGrabacion = async (blob, causa, duracion, roomCode) => {
+  const id       = `${Date.now()}`;
+  const path     = `lunita_llantos/${roomCode||"local"}/${id}.webm`;
+  const ref      = storage.ref(path);
+  await ref.put(blob, {contentType:"audio/webm"});
+  const url      = await ref.getDownloadURL();
+  await db.collection("lunita_llantos").add({
+    roomCode: roomCode||"local",
+    causa, duracion, url, path,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return { id, causa, duracion, url, createdAt: new Date().toISOString() };
+};
+
+const loadGrabaciones = async (roomCode) => {
+  const snap = await db.collection("lunita_llantos")
+    .where("roomCode","==", roomCode||"local")
+    .orderBy("createdAt","desc")
+    .limit(200)
+    .get();
+  return snap.docs.map(d=>({id:d.id,...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString()||new Date().toISOString()}));
+};
+
+function LlantoView({ roomCode, onSaveGrabacion, grabaciones, loading: loadingGrab }) {
+  const [fase, setFase]    = useState("idle"); // idle|countdown|grabando|causa|subiendo|guardado|error
+  const [segundos, setSeg] = useState(8);
+  const [causa, setCausa]  = useState(null);
+  const [blob, setBlob]    = useState(null);
+  const [audioUrl, setUrl] = useState(null);
+  const [errMsg, setErr]   = useState("");
+  const timerRef   = useRef(null);
+  const streamRef  = useRef(null);
+  const chunksRef  = useRef([]);
+  const recRef     = useRef(null);
+
+  const cleanup = () => {
+    clearInterval(timerRef.current);
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+  };
+  useEffect(() => () => cleanup(), []);
+
+  const startGrab = async () => {
+    setErr("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
+      streamRef.current = stream;
+      chunksRef.current = [];
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus" : "audio/webm";
+      const rec = new MediaRecorder(stream, {mimeType});
+      recRef.current = rec;
+
+      rec.ondataavailable = e => { if(e.data.size>0) chunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        const b = new Blob(chunksRef.current, {type:"audio/webm"});
+        setBlob(b);
+        setUrl(URL.createObjectURL(b));
+        streamRef.current?.getTracks().forEach(t=>t.stop());
+        setFase("causa");
+      };
+
+      // 3s countdown then record
+      setFase("countdown");
+      let cd = 3; setSeg(cd);
+      timerRef.current = setInterval(()=>{
+        cd--;
+        if(cd<=0){
+          clearInterval(timerRef.current);
+          rec.start(100);
+          setFase("grabando");
+          let secs=8; setSeg(secs);
+          timerRef.current = setInterval(()=>{
+            secs--; setSeg(secs);
+            if(secs<=0){ clearInterval(timerRef.current); rec.stop(); }
+          },1000);
+        } else setSeg(cd);
+      },1000);
+    } catch(e) {
+      setErr("No se pudo acceder al micrófono. Comprueba los permisos de la app.");
+      setFase("idle");
+    }
+  };
+
+  const cancelar = () => {
+    recRef.current?.state==="recording" && recRef.current.stop();
+    cleanup();
+    setFase("idle"); setCausa(null); setBlob(null); setUrl(null);
+  };
+
+  const guardar = async () => {
+    if(!causa||!blob) return;
+    setFase("subiendo");
+    try {
+      const g = await uploadGrabacion(blob, causa, 8, roomCode);
+      onSaveGrabacion(g);
+      setCausa(null); setBlob(null); setUrl(null);
+      setFase("guardado");
+      setTimeout(()=>setFase("idle"), 2200);
+    } catch(e) {
+      console.error(e);
+      setErr("Error al subir la grabación. Comprueba la conexión.");
+      setFase("error");
+    }
+  };
+
+  const total    = grabaciones.length;
+  const objetivo = 150;
+  const porCausa = CAUSAS.map(c=>({...c, n:grabaciones.filter(g=>g.causa===c.id).length}))
+                         .filter(c=>c.n>0).sort((a,b)=>b.n-a.n);
+  const pct = n => total>0 ? Math.round(n/total*100) : 0;
+
+  return (
+    <div style={{padding:16, paddingBottom:32}}>
+
+      {/* IDLE */}
+      {fase==="idle" && <>
+        <div style={{textAlign:"center", marginBottom:24}}>
+          <button onClick={startGrab} style={{
+            width:150, height:150, borderRadius:75, border:"none", cursor:"pointer",
+            backgroundColor:hexA("#f87171",0.12),
+            boxShadow:`0 0 0 14px ${hexA("#f87171",0.07)}, 0 0 0 28px ${hexA("#f87171",0.03)}`,
+            display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+            gap:8, margin:"0 auto", fontFamily:"inherit",
+          }}>
+            <span style={{fontSize:52}}>🎙️</span>
+            <span style={{fontSize:13,fontWeight:900,color:"#f87171"}}>GRABAR</span>
+          </button>
+          <div style={{fontSize:12,color:C.muted,marginTop:20,lineHeight:1.8}}>
+            Pulsa cuando el bebé esté llorando.<br/>
+            Graba 8 segundos y luego te pregunta la causa.
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{backgroundColor:C.surface,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{fontSize:12,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5}}>Progreso</span>
+            <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{total} / {objetivo}</span>
+          </div>
+          <div style={{height:8,backgroundColor:C.elevated,borderRadius:4}}>
+            <div style={{height:8,backgroundColor:C.accent,borderRadius:4,width:`${Math.min(100,total/objetivo*100)}%`,transition:"width 0.5s"}}/>
+          </div>
+          <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:"center"}}>
+            {total===0 ? "Aún sin grabaciones — ¡empieza hoy!"
+             : total<objetivo ? `${objetivo-total} grabaciones para poder entrenar la IA 🧠`
+             : "🎉 ¡Objetivo alcanzado! Ya puedes entrenar la IA"}
+          </div>
+        </div>
+
+        {/* Stats */}
+        {loadingGrab && <div style={{textAlign:"center",color:C.muted,fontSize:13,padding:16}}>Cargando grabaciones…</div>}
+        {!loadingGrab && total>0 && (
+          <div style={{backgroundColor:C.surface,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:14}}>Causas más frecuentes</div>
+            {porCausa.map(c=>(
+              <div key={c.id} style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:13,color:C.text}}>{c.emoji} {c.label}</span>
+                  <span style={{fontSize:13,fontWeight:800,color:c.color}}>{c.n} · {pct(c.n)}%</span>
+                </div>
+                <div style={{height:6,backgroundColor:C.elevated,borderRadius:3}}>
+                  <div style={{height:6,backgroundColor:c.color,borderRadius:3,width:`${pct(c.n)}%`,transition:"width 0.5s"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>}
+
+      {/* COUNTDOWN */}
+      {fase==="countdown" && (
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <div style={{fontSize:96,fontWeight:900,color:C.accent,lineHeight:1}}>{segundos}</div>
+          <div style={{fontSize:15,color:C.muted,marginTop:16}}>Prepara el micrófono…</div>
+          <button onClick={cancelar} style={{...ghostBtn,marginTop:28,width:"auto",display:"inline-flex"}}>Cancelar</button>
+        </div>
+      )}
+
+      {/* GRABANDO */}
+      {fase==="grabando" && (
+        <div style={{textAlign:"center",padding:"40px 0"}}>
+          <div style={{position:"relative",width:130,height:130,margin:"0 auto 20px"}}>
+            <div style={{position:"absolute",inset:0,borderRadius:65,backgroundColor:hexA("#f87171",0.2),animation:"pulse 1s ease-in-out infinite"}}/>
+            <div style={{position:"absolute",inset:8,borderRadius:57,backgroundColor:"#f87171",display:"flex",alignItems:"center",justifyContent:"center",fontSize:52}}>🎙️</div>
+          </div>
+          <div style={{fontSize:64,fontWeight:900,color:"#f87171",lineHeight:1}}>{segundos}</div>
+          <div style={{fontSize:14,color:C.muted,marginTop:10}}>Grabando…</div>
+          <button onClick={cancelar} style={{...ghostBtn,marginTop:24,width:"auto",display:"inline-flex"}}>Cancelar</button>
+        </div>
+      )}
+
+      {/* CAUSA */}
+      {fase==="causa" && (
+        <div>
+          <div style={{fontSize:17,fontWeight:900,marginBottom:4,color:C.text}}>¿Qué le pasaba?</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Atiéndele primero, luego vuelve y marca la causa.</div>
+          {audioUrl && <audio controls src={audioUrl} style={{width:"100%",marginBottom:16,borderRadius:8}}/>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            {CAUSAS.map(c=>(
+              <button key={c.id} onClick={()=>setCausa(c.id)} style={{
+                padding:"12px 10px",borderRadius:12,
+                border:`2px solid ${causa===c.id?c.color:C.border}`,
+                backgroundColor:causa===c.id?hexA(c.color,0.15):C.surface,
+                cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,
+              }}>
+                <span style={{fontSize:22}}>{c.emoji}</span>
+                <span style={{fontSize:13,fontWeight:800,color:causa===c.id?c.color:C.text}}>{c.label}</span>
+              </button>
+            ))}
+          </div>
+          {causa && <button style={primaryBtn} onClick={guardar}>☁️ Guardar y subir</button>}
+          <button style={ghostBtn} onClick={cancelar}>Descartar</button>
+        </div>
+      )}
+
+      {/* SUBIENDO */}
+      {fase==="subiendo" && (
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <span className="spin" style={{fontSize:48,display:"block",marginBottom:16}}>⏳</span>
+          <div style={{fontSize:15,fontWeight:800,color:C.text}}>Subiendo grabación…</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:8}}>Guardando en la nube</div>
+        </div>
+      )}
+
+      {/* GUARDADO */}
+      {fase==="guardado" && (
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <div style={{fontSize:64}}>✅</div>
+          <div style={{fontSize:17,fontWeight:900,color:C.text,marginTop:16}}>¡Guardado en la nube!</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:8}}>Grabación sincronizada</div>
+        </div>
+      )}
+
+      {/* ERROR */}
+      {fase==="error" && (
+        <div style={{textAlign:"center",padding:"40px 0"}}>
+          <div style={{fontSize:52}}>⚠️</div>
+          <div style={{fontSize:15,fontWeight:800,color:"#f87171",marginTop:16}}>Error</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:8,marginBottom:24}}>{errMsg}</div>
+          <button style={primaryBtn} onClick={()=>setFase("idle")}>Volver</button>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
 // ─── LINTERNA VIEW ─────────────────────────────────────────────────────────────
 function LinternaView({ color, setColor, brightness, setBrightness, active, setActive }) {
   return (
@@ -1102,11 +1365,14 @@ function App() {
   const [ready,setReady]       = useState(false);
   const [entries,setEntries]   = useState([]);
   const [tab,setTab]           = useState("registro");
+  const prevTabRef = useRef(null);
   const [modal,setModal]       = useState(false);
   const [finalEntry,setFinal]  = useState(null);
   const [showSala,setShowSala] = useState(false);
   const [showImport,setShowImport] = useState(false);
   const [showStats, setShowStats]   = useState(false);
+  const [grabaciones,    setGrabaciones]    = useState([]);
+  const [loadingGrab,    setLoadingGrab]    = useState(false);
   const [lightColor,setLC]     = useState(LIGHT_COLORS[0]);
   const [brightness,setBr]     = useState(0.65);
   const [lightActive,setLA]    = useState(false);
@@ -1148,6 +1414,18 @@ function App() {
   const updateEntry = (id,upd) => persist(entries.map(e=>e.id===id?{...e,...upd}:e));
   const handleImport= imported => { const ids=new Set(entries.map(e=>e.id)); persist([...imported.filter(e=>!ids.has(e.id)),...entries]); };
 
+  // Load grabaciones when user opens llanto tab
+  useEffect(()=>{
+    if(tab==="llanto" && prevTabRef.current!=="llanto" && setup) {
+      setLoadingGrab(true);
+      loadGrabaciones(setup.roomCode).then(gs=>{
+        setGrabaciones(gs);
+        setLoadingGrab(false);
+      }).catch(()=>setLoadingGrab(false));
+    }
+    prevTabRef.current = tab;
+  },[tab, setup]);
+
   const toggleSound = id => {
     const eng=audioRef.current; if(!eng)return;
     if(playing[id]){eng.stop(id);setPlaying(p=>{const n={...p};delete n[id];return n;});}
@@ -1158,6 +1436,9 @@ function App() {
     }
   };
   const setVol=(id,v)=>{setVolumes(p=>({...p,[id]:v}));if(playing[id])audioRef.current?.setVol(id,v);};
+  const saveGrabacion = g => {
+    setGrabaciones(p => [g, ...p]);
+  };
 
   const handleLeaveSala = () => {
     unsubRef.current?.(); localStorage.removeItem(LS_SETUP); saveLocal([]);
@@ -1203,6 +1484,7 @@ function App() {
         {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)} onReorder={persist}/>}
         {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
         {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current}/>}
+        {tab==="llanto"  &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
       </div>
 
       {tab==="registro"&&(
@@ -1210,7 +1492,7 @@ function App() {
       )}
 
       <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {[{id:"registro",label:"Registro",emoji:"📋"},{id:"linterna",label:"Linterna",emoji:"💡"},{id:"sonidos",label:"Sonidos",emoji:"🎵"}].map(t=>(
+        {[{id:"registro",label:"Registro",emoji:"📋"},{id:"linterna",label:"Linterna",emoji:"💡"},{id:"sonidos",label:"Sonidos",emoji:"🎵"},{id:"llanto",label:"Llanto",emoji:"🎙️"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 0 12px",border:"none",background:"none",cursor:"pointer",fontFamily:"inherit"}}>
             <span style={{fontSize:22,filter:tab===t.id?"none":"grayscale(1) opacity(0.45)"}}>{t.emoji}</span>
             <span style={{fontSize:10,fontWeight:800,color:tab===t.id?C.accent:C.muted}}>{t.label}</span>
