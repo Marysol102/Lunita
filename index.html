@@ -1063,7 +1063,84 @@ const loadGrabaciones = async (roomCode) => {
   return snap.docs.map(d=>({id:d.id,...d.data(), createdAt: d.data().createdAt?.toDate?.()?.toISOString()||new Date().toISOString()}));
 };
 
-function LlantoView({ roomCode, onSaveGrabacion, grabaciones, loading: loadingGrab }) {
+const deleteGrabacion = async (id) => {
+  await db.collection("lunita_llantos").doc(id).delete();
+  // Note: Cloudinary asset stays (no server-side delete without signed API)
+  // but the entry disappears from the app
+};
+
+function GrabacionRow({ g, causa, label, onDelete }) {
+  const [playing,   setPlaying]   = useState(false);
+  const [confirm,   setConfirm]   = useState(false);
+  const [deleting,  setDeleting]  = useState(false);
+  const audioRef   = useRef(null);
+  const longRef    = useRef(null);
+
+  const toggle = () => {
+    if(!audioRef.current) return;
+    if(playing){ audioRef.current.pause(); audioRef.current.currentTime=0; setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
+
+  const startLong = () => {
+    longRef.current = setTimeout(()=>{
+      navigator.vibrate?.(40);
+      setConfirm(true);
+    }, 600);
+  };
+  const cancelLong = () => clearTimeout(longRef.current);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try { await deleteGrabacion(g.id); onDelete(g.id); }
+    catch { setDeleting(false); setConfirm(false); }
+  };
+
+  if(confirm) return (
+    <div style={{padding:"12px 0",borderBottom:`1px solid ${C.border}`}}>
+      <div style={{fontSize:13,fontWeight:800,color:"#f87171",marginBottom:10}}>
+        {causa.emoji} ¿Borrar esta grabación?
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={handleDelete} disabled={deleting} style={{flex:1,padding:"9px",borderRadius:10,border:"none",backgroundColor:"#f87171",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+          {deleting?<span className="spin">⏳</span>:"🗑 Borrar"}
+        </button>
+        <button onClick={()=>setConfirm(false)} style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${C.border}`,backgroundColor:C.elevated,color:C.muted,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      onTouchStart={startLong}
+      onTouchEnd={cancelLong}
+      onTouchMove={cancelLong}
+      onMouseDown={startLong}
+      onMouseUp={cancelLong}
+      onMouseLeave={cancelLong}
+      style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${C.border}`,userSelect:"none"}}
+    >
+      <span style={{fontSize:20,flexShrink:0}}>{causa.emoji}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:800,color:causa.color}}>{causa.label}</div>
+        <div style={{fontSize:11,color:C.muted}}>{label}</div>
+      </div>
+      {g.url && <>
+        <audio ref={audioRef} src={g.url} onEnded={()=>setPlaying(false)} style={{display:"none"}}/>
+        <button onClick={toggle} style={{
+          flexShrink:0, border:`1px solid ${playing?causa.color:C.border}`,
+          backgroundColor:playing?hexA(causa.color,0.15):C.elevated,
+          borderRadius:20, width:36, height:36, cursor:"pointer",
+          fontSize:14, display:"flex", alignItems:"center", justifyContent:"center",
+        }}>{playing?"⏹":"▶"}</button>
+      </>}
+    </div>
+  );
+}
+
+function LlantoView({ roomCode, onSaveGrabacion, onDeleteGrabacion, grabaciones, loading: loadingGrab }) {
   const [fase, setFase]    = useState("idle"); // idle|countdown|grabando|causa|subiendo|guardado|error
   const [segundos, setSeg] = useState(8);
   const [causa, setCausa]  = useState(null);
@@ -1193,7 +1270,7 @@ function LlantoView({ roomCode, onSaveGrabacion, grabaciones, loading: loadingGr
         {/* Stats */}
         {loadingGrab && <div style={{textAlign:"center",color:C.muted,fontSize:13,padding:16}}>Cargando grabaciones…</div>}
         {!loadingGrab && total>0 && (
-          <div style={{backgroundColor:C.surface,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+          <div style={{backgroundColor:C.surface,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:14}}>
             <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:14}}>Causas más frecuentes</div>
             {porCausa.map(c=>(
               <div key={c.id} style={{marginBottom:12}}>
@@ -1206,6 +1283,21 @@ function LlantoView({ roomCode, onSaveGrabacion, grabaciones, loading: loadingGr
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* HISTORIAL DE GRABACIONES */}
+        {!loadingGrab && total>0 && (
+          <div style={{backgroundColor:C.surface,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:14}}>Historial</div>
+            {grabaciones.map((g,i)=>{
+              const causa = CAUSAS.find(c=>c.id===g.causa)||CAUSAS[CAUSAS.length-1];
+              const fecha = new Date(g.createdAt);
+              const label = fecha.toLocaleDateString("es-ES",{day:"numeric",month:"short"})+" · "+fecha.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
+              return (
+                <GrabacionRow key={g.id||i} g={g} causa={causa} label={label} onDelete={onDeleteGrabacion}/>
+              );
+            })}
           </div>
         )}
       </>}
@@ -1386,6 +1478,12 @@ function App() {
   const [showSala,setShowSala] = useState(false);
   const [showImport,setShowImport] = useState(false);
   const [showStats, setShowStats]   = useState(false);
+  const [fontScale, setFontScale]   = useState(()=>{ try{return parseFloat(localStorage.getItem("lunita_font")||"1");}catch{return 1;} });
+
+  useEffect(()=>{
+    document.documentElement.style.fontSize = `${fontScale * 16}px`;
+    try{localStorage.setItem("lunita_font", String(fontScale));}catch{}
+  },[fontScale]);
   const [grabaciones,    setGrabaciones]    = useState([]);
   const [loadingGrab,    setLoadingGrab]    = useState(false);
   const [lightColor,setLC]     = useState(LIGHT_COLORS[0]);
@@ -1454,6 +1552,9 @@ function App() {
   const saveGrabacion = g => {
     setGrabaciones(p => [g, ...p]);
   };
+  const removeGrabacion = id => {
+    setGrabaciones(p => p.filter(g => g.id !== id));
+  };
 
   const handleLeaveSala = () => {
     unsubRef.current?.(); localStorage.removeItem(LS_SETUP); saveLocal([]);
@@ -1487,6 +1588,16 @@ function App() {
           <button onClick={()=>setShowStats(true)} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 12px",color:C.muted,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
             📊
           </button>
+          <div style={{display:"flex",alignItems:"center",border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,overflow:"hidden"}}>
+            {[{label:"A",scale:0.85},{label:"A",scale:1},{label:"A",scale:1.18}].map((f,i)=>(
+              <button key={i} onClick={()=>setFontScale(f.scale)} style={{
+                border:"none", background:fontScale===f.scale?C.elevated:"transparent",
+                color:fontScale===f.scale?C.accent:C.muted,
+                padding:"6px 9px", cursor:"pointer", fontFamily:"inherit",
+                fontSize:9+i*3, fontWeight:800, lineHeight:1,
+              }}>{f.label}</button>
+            ))}
+          </div>
           {isSala&&(
             <button onClick={()=>setShowSala(true)} style={{border:`1px solid ${C.border}`,backgroundColor:C.surface,borderRadius:10,padding:"6px 12px",color:C.accent,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
               👨‍👩‍👧 {setup.roomCode}
@@ -1499,7 +1610,7 @@ function App() {
         {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)} onReorder={persist}/>}
         {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
         {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current}/>}
-        {tab==="llanto"  &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
+        {tab==="llanto"  &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
       </div>
 
       {tab==="registro"&&(
