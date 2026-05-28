@@ -51,7 +51,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 
 <script>
 firebase.initializeApp({
@@ -63,7 +62,6 @@ firebase.initializeApp({
   appId:             "1:958984288633:web:c88980de5de0a5422597a8"
 });
 const db      = firebase.firestore();
-const storage = firebase.storage();
 </script>
 
 <script type="text/babel">
@@ -1024,19 +1022,36 @@ const CAUSAS = [
   {id:"otro",      label:"Otro",             emoji:"❓", color:"#7b82a0"},
 ];
 
-// Upload audio blob to Firebase Storage, save metadata to Firestore
+// ─── CLOUDINARY CONFIG ───────────────────────────────────────────────────────
+const CLOUDINARY_CLOUD  = "dlisp6bbu";
+const CLOUDINARY_PRESET = "lunita_audio";
+
+// Upload audio blob to Cloudinary, save metadata to Firestore
 const uploadGrabacion = async (blob, causa, duracion, roomCode) => {
-  const id       = `${Date.now()}`;
-  const path     = `lunita_llantos/${roomCode||"local"}/${id}.webm`;
-  const ref      = storage.ref(path);
-  await ref.put(blob, {contentType:"audio/webm"});
-  const url      = await ref.getDownloadURL();
-  await db.collection("lunita_llantos").add({
+  // 1. Upload to Cloudinary
+  const formData = new FormData();
+  formData.append("file", blob, `llanto_${Date.now()}.webm`);
+  formData.append("upload_preset", CLOUDINARY_PRESET);
+  formData.append("folder", "lunita_llantos");
+  formData.append("resource_type", "video"); // Cloudinary uses "video" for audio files
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`,
+    { method:"POST", body:formData }
+  );
+  if(!res.ok) throw new Error(`Cloudinary error: ${res.status}`);
+  const data = await res.json();
+  const url  = data.secure_url;
+  const publicId = data.public_id;
+
+  // 2. Save metadata to Firestore
+  const docRef = await db.collection("lunita_llantos").add({
     roomCode: roomCode||"local",
-    causa, duracion, url, path,
+    causa, duracion, url, publicId,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
-  return { id, causa, duracion, url, createdAt: new Date().toISOString() };
+
+  return { id:docRef.id, causa, duracion, url, createdAt: new Date().toISOString() };
 };
 
 const loadGrabaciones = async (roomCode) => {
