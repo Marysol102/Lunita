@@ -1541,8 +1541,8 @@ function LlantoView({ roomCode, onSaveGrabacion, onDeleteGrabacion, onUpdateGrab
         </div>
       )}
 
-    </div>
     {editGrabacion&&<EditGrabacionModal g={editGrabacion} onSave={(id,causa)=>{onUpdateGrabacion(id,causa);setEditGrabacion(null);}} onClose={()=>setEditGrabacion(null)}/>}
+    </div>
   );
 }
 
