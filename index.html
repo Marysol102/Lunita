@@ -108,6 +108,17 @@ const SOUNDS = [
   {id:"womb",  label:"Vientre materno", emoji:"🫀",  mp3:false},
 ];
 
+const CAUSAS = [
+  {id:"hambre",    label:"Hambre",           emoji:"🍼", color:"#f5a623"},
+  {id:"sueno",     label:"Sueño",            emoji:"😴", color:"#62a8f5"},
+  {id:"gases",     label:"Gases",            emoji:"💨", color:"#4ade80"},
+  {id:"dolor",     label:"Dolor",            emoji:"😣", color:"#f87171"},
+  {id:"panal",     label:"Pañal",            emoji:"🧷", color:"#c084fc"},
+  {id:"calor",     label:"Calor/frío",       emoji:"🌡️", color:"#fb923c"},
+  {id:"estimulo",  label:"Sobre-estimulado", emoji:"😵", color:"#f472b6"},
+  {id:"otro",      label:"Otro",             emoji:"❓", color:"#7b82a0"},
+];
+
 // ─── AUDIO ENGINE ──────────────────────────────────────────────────────────────
 // Synth fallbacks for sounds without an MP3 yet
 function buildNoise(ctx, type) {
@@ -1166,16 +1177,7 @@ function StatsModal({ entries, onClose }) {
 }
 
 // ─── LLANTO VIEW ───────────────────────────────────────────────────────────────
-const CAUSAS = [
-  {id:"hambre",    label:"Hambre",           emoji:"🍼", color:"#f5a623"},
-  {id:"sueno",     label:"Sueño",            emoji:"😴", color:"#62a8f5"},
-  {id:"gases",     label:"Gases",            emoji:"💨", color:"#4ade80"},
-  {id:"dolor",     label:"Dolor",            emoji:"😣", color:"#f87171"},
-  {id:"panal",     label:"Pañal",            emoji:"🧷", color:"#c084fc"},
-  {id:"calor",     label:"Calor/frío",       emoji:"🌡️", color:"#fb923c"},
-  {id:"estimulo",  label:"Sobre-estimulado", emoji:"😵", color:"#f472b6"},
-  {id:"otro",      label:"Otro",             emoji:"❓", color:"#7b82a0"},
-];
+// CAUSAS moved to top
 
 // ─── CLOUDINARY CONFIG ───────────────────────────────────────────────────────
 const CLOUDINARY_CLOUD  = "dlisp6bbu";
