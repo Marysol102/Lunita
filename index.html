@@ -434,6 +434,7 @@ function AddEntryModal({ onSave, onClose }) {
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",step:1}))}><span style={{fontSize:26}}>🤱</span><div><div style={{fontWeight:800,fontSize:16}}>Toma de pecho</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Lactancia o biberón</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"extraccion",step:21}))}><span style={{fontSize:26}}>🥛</span><div><div style={{fontWeight:800,fontSize:16}}>Extracción con sacaleches</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Teta, fecha/hora y ml</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"jeringa-dedo",step:20}))}><span style={{fontSize:26}}>🍼</span><div><div style={{fontWeight:800,fontSize:16}}>Biberón</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
+    <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"sueno",step:30}))}><span style={{fontSize:26}}>😴</span><div><div style={{fontWeight:800,fontSize:16}}>Sueño</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar hora de inicio y fin</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"panal",step:10}))}><span style={{fontSize:26}}>🧷</span><div><div style={{fontWeight:800,fontSize:16}}>Cambio de pañal</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar tipo y cantidad</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
   </div></div>);
@@ -547,6 +548,39 @@ function AddEntryModal({ onSave, onClose }) {
     <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
     {s.ml&&Number(s.ml)>0&&<button style={primaryBtn} onClick={saveComplete}>💾 Guardar extracción</button>}
     <button style={ghostBtn} onClick={()=>u("step",22)}>← Atrás</button>
+  </div></div>);
+
+  if(s.type==="sueno"&&s.step===30) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("😴 Sueño — ¿cuándo empezó?")}
+    <button style={nowBtn} onClick={()=>setS(p=>({...p,sd:todayStr(),st:nowTimeStr(),step:31}))}><span style={{fontSize:20}}>🕐</span><div><div style={{fontWeight:800}}>¿Es ahora?</div><div style={{fontSize:12,fontWeight:400}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</div></div></button>
+    <div style={{margin:"16px 0 0"}}><DTPicker label="O elige fecha y hora" date={s.sd} time={s.st} onDate={v=>u("sd",v)} onTime={v=>u("st",v)}/></div>
+    {s.st&&<><button style={primaryBtn} onClick={()=>u("step",31)}>Siguiente →</button>
+    <button style={{...bigBtn,borderColor:C.orange,color:C.orange,backgroundColor:hexA(C.orange,0.1),justifyContent:"center",fontSize:14}} onClick={()=>{onSave({type:"sueno",status:"en_curso",startDate:s.sd,startTime:s.st,comment:s.comment});onClose();}}>⏱ Guardar inicio · añadir fin después</button></>}
+    <button style={ghostBtn} onClick={onClose}>Cancelar</button>
+  </div></div>);
+
+  if(s.type==="sueno"&&s.step===31) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("😴 Sueño — ¿cuándo terminó?")}
+    <div style={{backgroundColor:C.elevated,borderRadius:12,padding:"10px 14px",marginBottom:16,border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:11,color:C.muted}}>Inicio</div>
+      <div style={{fontWeight:800,fontSize:14,color:C.accent}}>{fmtDateTime(s.sd,s.st)}</div>
+    </div>
+    <button style={nowBtn} onClick={()=>setS(p=>({...p,ed:todayStr(),et:nowTimeStr(),step:32}))}><span style={{fontSize:20}}>🕐</span><div><div style={{fontWeight:800}}>¿Es ahora?</div><div style={{fontSize:12,fontWeight:400}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</div></div></button>
+    <div style={{margin:"16px 0 0"}}><DTPicker label="O elige fecha y hora" date={s.ed} time={s.et} onDate={v=>u("ed",v)} onTime={v=>u("et",v)}/></div>
+    {s.et&&<button style={primaryBtn} onClick={()=>u("step",32)}>Ver resumen →</button>}
+    <button style={ghostBtn} onClick={()=>u("step",30)}>← Atrás</button>
+  </div></div>);
+
+  if(s.type==="sueno"&&s.step===32) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
+    {T("😴 Resumen de sueño")}
+    <div style={{backgroundColor:C.elevated,borderRadius:14,padding:"4px 16px 8px",marginBottom:18,border:`1px solid ${C.border}`}}>
+      <SRow label="Inicio"   value={fmtDateTime(s.sd,s.st)}/>
+      <SRow label="Fin"      value={fmtDateTime(s.ed,s.et)}/>
+      <SRow label="Duración" value={fmtDur(calcDur(s.sd,s.st,s.ed,s.et))} hi/>
+    </div>
+    <CommentBox value={s.comment} onChange={v=>u("comment",v)}/>
+    <button style={primaryBtn} onClick={()=>{onSave({type:"sueno",status:"done",startDate:s.sd,startTime:s.st,endDate:s.ed,endTime:s.et,duration:calcDur(s.sd,s.st,s.ed,s.et),comment:s.comment});onClose();}}>💾 Guardar sueño</button>
+    <button style={ghostBtn} onClick={()=>u("step",31)}>← Atrás</button>
   </div></div>);
 
   if(s.type==="panal"&&s.step===10) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
@@ -825,7 +859,7 @@ const fmtDayLabel = dateStr => {
   return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
 };
 
-function DaySeparator({ label, tomas, biberones, panales }) {
+function DaySeparator({ label, tomas, biberones, panales, sueno }) {
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px 6px"}}>
       <div style={{flex:1,height:1,backgroundColor:C.border}}/>
@@ -835,6 +869,7 @@ function DaySeparator({ label, tomas, biberones, panales }) {
         <span style={{fontSize:11,color:C.muted}}>🤱 {tomas}</span>
         {biberones>0&&<span style={{fontSize:11,color:C.muted}}>🍼 {biberones}</span>}
         <span style={{fontSize:11,color:C.muted}}>🧷 {panales}</span>
+        {sueno>0&&<span style={{fontSize:11,color:C.muted}}>😴 {fmtDur(sueno)}</span>}
       </div>
       <div style={{flex:1,height:1,backgroundColor:C.border}}/>
     </div>
@@ -938,19 +973,26 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
 
       <div style={{padding:"16px 16px 10px"}}>
         <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"capitalize",marginBottom:8,letterSpacing:0.5}}>{fmtDayLabel(topDay)}</div>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
-          {[
-            {label:"Tomas",  value:topEntries.filter(e=>e.type==="toma"&&e.breast!=="jeringa-dedo"&&e.breast!=="extraccion").length, emoji:"🤱"},
-            {label:"Biberón",value:topEntries.filter(e=>e.breast==="jeringa-dedo").length, emoji:"🍼"},
-            {label:"Pañales",value:topEntries.filter(e=>e.type==="panal").length, emoji:"🧷"},
-          ].map(s=>(
-            <div key={s.label} style={{flex:1,backgroundColor:C.surface,borderRadius:14,padding:"10px 10px",border:`1px solid ${C.border}`,textAlign:"center"}}>
-              <div style={{fontSize:20}}>{s.emoji}</div>
-              <div style={{fontSize:22,fontWeight:900,color:C.accent,lineHeight:1.1}}>{s.value}</div>
-              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
+        {(()=>{
+          const suenoSecs = topEntries.filter(e=>e.type==="sueno"&&e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
+          const suenoLabel = suenoSecs>0 ? fmtDur(suenoSecs) : "0h";
+          return (
+            <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+              {[
+                {label:"Tomas",  value:topEntries.filter(e=>e.type==="toma"&&e.breast!=="jeringa-dedo"&&e.breast!=="extraccion").length, emoji:"🤱", isNum:true},
+                {label:"Biberón",value:topEntries.filter(e=>e.breast==="jeringa-dedo").length, emoji:"🍼", isNum:true},
+                {label:"Pañales",value:topEntries.filter(e=>e.type==="panal").length, emoji:"🧷", isNum:true},
+                {label:"Sueño",  value:suenoLabel, emoji:"😴", isNum:false},
+              ].map(s=>(
+                <div key={s.label} style={{flex:"1 1 22%",minWidth:60,backgroundColor:C.surface,borderRadius:14,padding:"10px 6px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+                  <div style={{fontSize:18}}>{s.emoji}</div>
+                  <div style={{fontSize:s.isNum?22:14,fontWeight:900,color:C.accent,lineHeight:1.1}}>{s.value}</div>
+                  <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
         <div style={{display:"flex",gap:8,marginBottom:enCurso>0?10:0}}>
           <button onClick={onExport} style={{flex:1,padding:"9px 10px",borderRadius:10,border:`1px solid ${C.border}`,backgroundColor:C.surface,color:C.muted,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>📥 Exportar</button>
           <button onClick={onImport} style={{flex:1,padding:"9px 10px",borderRadius:10,border:`1px solid ${C.border}`,backgroundColor:C.surface,color:C.muted,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>📤 Importar</button>
@@ -984,7 +1026,7 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
               // Day separator
               if(eDay !== lastDay && lastDay !== null) {
                 const dEntries = entries.filter(en=>getEntryDate(en)===eDay);
-                items.push(<DaySeparator key={`sep-${eDay}`} label={fmtDayLabel(eDay)} tomas={dEntries.filter(en=>en.type==="toma"&&en.breast!=="jeringa-dedo"&&en.breast!=="extraccion").length} biberones={dEntries.filter(en=>en.breast==="jeringa-dedo").length} panales={dEntries.filter(en=>en.type==="panal").length}/>);
+                const dSuenoSecs=dEntries.filter(en=>en.type==="sueno"&&en.status==="done"&&en.duration).reduce((a,en)=>a+en.duration,0); items.push(<DaySeparator key={`sep-${eDay}`} label={fmtDayLabel(eDay)} tomas={dEntries.filter(en=>en.type==="toma"&&en.breast!=="jeringa-dedo"&&en.breast!=="extraccion").length} biberones={dEntries.filter(en=>en.breast==="jeringa-dedo").length} panales={dEntries.filter(en=>en.type==="panal").length} sueno={dSuenoSecs}/>);
               }
               lastDay = eDay;
               items.push(
@@ -1029,15 +1071,17 @@ function StatsModal({ entries, onClose }) {
       const ed = e.startDate || new Date(e.createdAt).toISOString().slice(0,10);
       return ed === date;
     });
+    const suenoSecs = de.filter(e=>e.type==="sueno"&&e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
     return {
       date,
       tomas:    de.filter(e=>e.type==="toma"&&e.breast!=="jeringa-dedo"&&e.breast!=="extraccion").length,
       biberones:de.filter(e=>e.breast==="jeringa-dedo").length,
       panales:  de.filter(e=>e.type==="panal").length,
+      suenoH:   Math.round(suenoSecs/3600*10)/10,
     };
   });
 
-  const maxVal = Math.max(1, ...dataByDay.map(d=>Math.max(d.tomas,d.biberones,d.panales)));
+  const maxVal = Math.max(1, ...dataByDay.map(d=>Math.max(d.tomas,d.biberones,d.panales,d.suenoH)));
 
   // SVG chart dimensions
   const W=340, H=180, padL=28, padB=30, padT=10, padR=10;
@@ -1105,6 +1149,7 @@ function StatsModal({ entries, onClose }) {
                 {key:"tomas",    val:d.tomas,     color:BAR_COLORS.tomas},
                 {key:"biberones",val:d.biberones,  color:BAR_COLORS.biberones},
                 {key:"panales",  val:d.panales,    color:BAR_COLORS.panales},
+                {key:"sueno",    val:d.suenoH,     color:"#818cf8"},
               ];
               const totalBarsW = bars.length*(barW+gap)-gap;
               return (
@@ -1129,8 +1174,8 @@ function StatsModal({ entries, onClose }) {
         </div>
 
         {/* Legend */}
-        <div style={{display:"flex",justifyContent:"center",gap:20,marginBottom:20}}>
-          {[{label:"Tomas",color:BAR_COLORS.tomas,emoji:"🤱"},{label:"Biberón",color:BAR_COLORS.biberones,emoji:"🍼"},{label:"Pañales",color:BAR_COLORS.panales,emoji:"🧷"}].map(l=>(
+        <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+          {[{label:"Tomas",color:BAR_COLORS.tomas,emoji:"🤱"},{label:"Biberón",color:BAR_COLORS.biberones,emoji:"🍼"},{label:"Pañales",color:BAR_COLORS.panales,emoji:"🧷"},{label:"Sueño(h)",color:"#818cf8",emoji:"😴"}].map(l=>(
             <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
               <div style={{width:10,height:10,borderRadius:2,backgroundColor:l.color}}/>
               <span style={{fontSize:11,color:C.muted}}>{l.label}</span>
@@ -1546,6 +1591,325 @@ function LlantoView({ roomCode, onSaveGrabacion, onDeleteGrabacion, onUpdateGrab
   );
 }
 
+// ─── OMS PERCENTILE DATA ──────────────────────────────────────────────────────
+// WHO Child Growth Standards - simplified LMS parameters for weight, length, head
+// Source: WHO (2006) - values at key ages in months
+// P3, P15, P50, P85, P97 lines
+const WHO_WEIGHT_BOYS = [
+  [0,2.5,2.9,3.3,3.9,4.3],[1,3.4,3.9,4.5,5.1,5.7],[2,4.3,4.9,5.6,6.3,7.0],
+  [3,5.0,5.7,6.4,7.2,7.9],[4,5.6,6.2,7.0,7.8,8.6],[5,6.0,6.7,7.5,8.4,9.2],
+  [6,6.4,7.1,7.9,8.8,9.7],[7,6.7,7.4,8.3,9.2,10.2],[8,6.9,7.7,8.6,9.6,10.5],
+  [9,7.1,7.9,8.9,9.9,10.8],[10,7.4,8.2,9.2,10.2,11.1],[11,7.6,8.4,9.4,10.5,11.4],
+  [12,7.7,8.6,9.6,10.8,11.8],[15,8.3,9.2,10.3,11.5,12.5],[18,8.8,9.8,11.0,12.3,13.4],
+  [24,9.7,10.8,12.2,13.6,14.8],[36,11.0,12.3,14.3,16.0,17.4],
+];
+const WHO_WEIGHT_GIRLS = [
+  [0,2.4,2.8,3.2,3.7,4.2],[1,3.2,3.6,4.2,4.8,5.4],[2,3.9,4.5,5.1,5.8,6.6],
+  [3,4.5,5.2,5.8,6.6,7.5],[4,5.0,5.7,6.4,7.3,8.2],[5,5.4,6.1,6.9,7.8,8.8],
+  [6,5.7,6.5,7.3,8.2,9.3],[7,6.0,6.8,7.6,8.6,9.7],[8,6.3,7.0,7.9,8.9,10.0],
+  [9,6.5,7.3,8.2,9.2,10.4],[10,6.7,7.5,8.5,9.6,10.7],[11,6.9,7.7,8.7,9.9,11.0],
+  [12,7.0,7.9,8.9,10.1,11.3],[15,7.6,8.5,9.6,10.9,12.2],[18,8.1,9.1,10.2,11.6,13.0],
+  [24,9.0,10.1,11.5,13.0,14.5],[36,10.3,11.6,13.9,15.7,17.2],
+];
+const WHO_LENGTH_BOYS = [
+  [0,46.3,47.9,49.9,51.8,53.4],[1,51.1,52.8,54.7,56.7,58.4],[2,54.7,56.4,58.4,60.4,62.2],
+  [3,57.6,59.4,61.4,63.5,65.3],[4,60.0,61.8,63.9,66.0,67.8],[5,61.9,63.8,65.9,68.0,69.9],
+  [6,63.6,65.5,67.6,69.8,71.6],[9,68.0,70.1,72.3,74.5,76.5],[12,71.7,74.0,76.1,78.4,80.5],
+  [18,77.5,79.6,82.3,85.1,87.1],[24,82.5,84.9,87.8,90.9,93.2],[36,88.7,91.1,94.9,98.7,101.2],
+];
+const WHO_LENGTH_GIRLS = [
+  [0,45.6,47.2,49.1,51.0,52.7],[1,50.2,51.9,53.7,55.6,57.3],[2,53.8,55.6,57.1,59.1,61.1],
+  [3,56.4,58.2,60.2,62.2,64.0],[4,58.7,60.6,62.1,64.5,66.3],[5,60.6,62.5,64.0,66.5,68.5],
+  [6,62.2,64.2,65.7,68.3,70.3],[9,66.3,68.5,71.1,73.8,75.9],[12,70.2,72.8,74.8,77.5,80.2],
+  [18,76.0,78.2,80.7,83.7,86.2],[24,81.0,83.5,86.4,89.8,92.2],[36,87.4,90.2,93.9,97.6,100.6],
+];
+
+// Interpolate percentile line value at age (months)
+const interpWHO = (table, ageMonths) => {
+  if(ageMonths <= table[0][0]) return table[0].slice(1);
+  if(ageMonths >= table[table.length-1][0]) return table[table.length-1].slice(1);
+  for(let i=0;i<table.length-1;i++){
+    if(ageMonths>=table[i][0]&&ageMonths<=table[i+1][0]){
+      const t=(ageMonths-table[i][0])/(table[i+1][0]-table[i][0]);
+      return table[i].slice(1).map((v,j)=>v+(table[i+1][j+1]-v)*t);
+    }
+  }
+  return table[table.length-1].slice(1);
+};
+
+// Get percentile rank of a value at given age
+const getPercentile = (table, ageMonths, value) => {
+  const [p3,p15,p50,p85,p97] = interpWHO(table, ageMonths);
+  if(value<=p3)  return "<P3";
+  if(value<=p15) return "P3–P15";
+  if(value<=p50) return "P15–P50";
+  if(value<=p85) return "P50–P85";
+  if(value<=p97) return "P85–P97";
+  return ">P97";
+};
+
+// ─── CRECIMIENTO VIEW ──────────────────────────────────────────────────────────
+function CrecimientoView({ babyInfo, setBabyInfo, medidas, onAddMedida, onDeleteMedida, roomCode }) {
+  const [showForm, setShowForm] = useState(false);
+  const [showSetup, setShowSetup] = useState(!babyInfo);
+  const [chartType, setChartType] = useState("peso"); // peso | talla
+  // Setup form
+  const [birthDate, setBirth] = useState("");
+  const [sexo, setSexo]       = useState("M");
+  // Medida form
+  const [fecha,  setFecha]  = useState(todayStr());
+  const [peso,   setPeso]   = useState("");
+  const [talla,  setTalla]  = useState("");
+  const [cabeza, setCabeza] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const saveBabyInfo = async () => {
+    if(!birthDate) return;
+    const info = {birthDate, sexo};
+    setBabyInfo(info);
+    await db.collection("lunita_salas").doc(roomCode||"local").update({babyInfo: info}).catch(()=>{});
+    setShowSetup(false);
+  };
+
+  const ageMonths = (fecha) => {
+    if(!babyInfo?.birthDate) return 0;
+    const birth = new Date(babyInfo.birthDate+"T12:00:00");
+    const d     = new Date(fecha+"T12:00:00");
+    return Math.max(0, (d-birth)/(1000*60*60*24*30.44));
+  };
+
+  const saveMedida = async () => {
+    if(!peso&&!talla&&!cabeza) return;
+    setSaving(true);
+    const m = { fecha, peso:peso?parseFloat(peso):null, talla:talla?parseFloat(talla):null, cabeza:cabeza?parseFloat(cabeza):null, createdAt:new Date().toISOString() };
+    try {
+      const ref = await db.collection("lunita_medidas").add({...m, roomCode:roomCode||"local"});
+      onAddMedida({...m, id:ref.id});
+      setPeso(""); setTalla(""); setCabeza(""); setShowForm(false);
+    } catch(e){ console.error(e); }
+    setSaving(false);
+  };
+
+  const wTable = babyInfo?.sexo==="F" ? WHO_WEIGHT_GIRLS : WHO_WEIGHT_BOYS;
+  const lTable = babyInfo?.sexo==="F" ? WHO_LENGTH_GIRLS : WHO_LENGTH_BOYS;
+
+  // Chart data
+  const sorted = [...medidas].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  // For talla: fill forward last known value when missing
+  const chartData = (() => {
+    if(chartType==="peso") return sorted.filter(m=>m.peso);
+    let lastTalla = null;
+    return sorted.map(m=>{
+      if(m.talla) { lastTalla=m.talla; return m; }
+      if(lastTalla) return {...m, talla:lastTalla, tallaEstimada:true};
+      return null;
+    }).filter(Boolean);
+  })();
+
+  // SVG chart
+  const W=340,H=200,padL=36,padB=28,padT=14,padR=10;
+  const cW=W-padL-padR, cH=H-padB-padT;
+
+  // Age range 0-12 months or up to max age
+  const maxAgeM = Math.max(12, ...chartData.map(m=>Math.ceil(ageMonths(m.fecha))+1));
+  const ageRange = Math.min(36, maxAgeM);
+
+  // Value range
+  const whoData = Array.from({length:ageRange+1},(_,i)=>interpWHO(chartType==="peso"?wTable:lTable, i));
+  const whoMin = Math.min(...whoData.map(d=>d[0]))*0.97;
+  const whoMax = Math.max(...whoData.map(d=>d[4]))*1.02;
+
+  const xScale = a => padL + (a/ageRange)*cW;
+  const yScale = v => padT + cH - ((v-whoMin)/(whoMax-whoMin))*cH;
+
+  const pctColors = ["#f87171","#fb923c","#facc15","#4ade80","#facc15","#fb923c","#f87171"];
+  const pctLabels = ["P3","P15","P50","P85","P97"];
+
+  const pctPath = (pctIdx) => {
+    const pts = Array.from({length:ageRange+1},(_,i)=>{
+      const vals = interpWHO(chartType==="peso"?wTable:lTable,i);
+      return `${xScale(i)},${yScale(vals[pctIdx])}`;
+    });
+    return "M"+pts.join("L");
+  };
+
+  // Latest measurement for percentile display
+  const latest = chartType==="talla" ? [...chartData].reverse().find(m=>!m.tallaEstimada) : chartData[chartData.length-1];
+  const latestAge = latest ? ageMonths(latest.fecha) : null;
+  const latestVal = latest ? (chartType==="peso"?latest.peso:latest.talla) : null;
+  const latestPct = (latestVal&&latestAge!=null) ? getPercentile(chartType==="peso"?wTable:lTable, latestAge, latestVal) : null;
+
+  // ── SETUP SCREEN ──
+  if(showSetup) return (
+    <div style={{padding:20}}>
+      <div style={{fontSize:19,fontWeight:900,marginBottom:8,color:C.text}}>📏 Configurar bebé</div>
+      <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>Necesito la fecha de nacimiento y el sexo para calcular los percentiles OMS correctamente.</div>
+      <label style={UL}>Fecha de nacimiento</label>
+      <input type="date" value={birthDate} max={todayStr()} onChange={e=>setBirth(e.target.value)}
+        style={{...tInput,width:"100%",fontSize:16,marginBottom:16}}/>
+      <label style={UL}>Sexo</label>
+      <div style={{display:"flex",gap:8,marginBottom:24}}>
+        {[{id:"M",label:"👦 Niño"},{id:"F",label:"👧 Niña"}].map(s=>(
+          <button key={s.id} onClick={()=>setSexo(s.id)} style={{
+            flex:1,padding:"12px",borderRadius:12,border:`2px solid ${sexo===s.id?C.accent:C.border}`,
+            backgroundColor:sexo===s.id?C.accentDim:C.elevated,color:sexo===s.id?C.accent:C.text,
+            fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"inherit"
+          }}>{s.label}</button>
+        ))}
+      </div>
+      <button style={primaryBtn} onClick={saveBabyInfo} disabled={!birthDate}>💾 Guardar</button>
+    </div>
+  );
+
+  // ── MAIN VIEW ──
+  return (
+    <div style={{padding:16,paddingBottom:32}}>
+
+      {/* Chart type selector */}
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        {[{id:"peso",label:"⚖️ Peso"},{ id:"talla",label:"📏 Talla"}].map(t=>(
+          <button key={t.id} onClick={()=>setChartType(t.id)} style={{
+            flex:1,padding:"9px",borderRadius:10,border:`1px solid ${chartType===t.id?C.accent:C.border}`,
+            backgroundColor:chartType===t.id?C.accentDim:C.surface,
+            color:chartType===t.id?C.accent:C.muted,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:"inherit"
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* SVG Chart with WHO percentile bands */}
+      <div style={{backgroundColor:C.surface,borderRadius:16,padding:"12px 4px 8px",marginBottom:14,border:`1px solid ${C.border}`}}>
+        {chartData.length===0 ? (
+          <div style={{textAlign:"center",padding:"30px 0",color:C.muted,fontSize:13}}>
+            Añade mediciones para ver la gráfica
+          </div>
+        ) : (
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
+            {/* Y grid */}
+            {[0,0.25,0.5,0.75,1].map(f=>{
+              const v = whoMin+(whoMax-whoMin)*f;
+              const y = yScale(v);
+              const label = chartType==="peso"?v.toFixed(1):Math.round(v);
+              return <g key={f}>
+                <line x1={padL} y1={y} x2={W-padR} y2={y} stroke={C.border} strokeWidth="1"/>
+                <text x={padL-4} y={y+3} textAnchor="end" fontSize="8" fill={C.muted}>{label}</text>
+              </g>;
+            })}
+            {/* X axis labels (months) */}
+            {Array.from({length:Math.min(ageRange,12)+1},(_,i)=>i*Math.ceil(ageRange/6)).filter((v,i,a)=>a.indexOf(v)===i&&v<=ageRange).map(m=>(
+              <text key={m} x={xScale(m)} y={H-4} textAnchor="middle" fontSize="8" fill={C.muted}>{m}m</text>
+            ))}
+            {/* WHO percentile lines */}
+            {[0,1,2,3,4].map((pi,i)=>(
+              <path key={pi} d={pctPath(pi)} fill="none"
+                stroke={pi===2?"#62a8f5":"#62a8f5"} strokeWidth={pi===2?1.5:0.8}
+                strokeDasharray={pi===2?"none":"4,3"} opacity={pi===2?0.6:0.3}/>
+            ))}
+            {/* P labels at right edge */}
+            {[0,1,2,3,4].map((pi)=>{
+              const vals = interpWHO(chartType==="peso"?wTable:lTable, ageRange);
+              return <text key={pi} x={W-padR+2} y={yScale(vals[pi])+3} fontSize="7" fill="#62a8f5" opacity="0.6">{pctLabels[pi]}</text>;
+            })}
+            {/* Baby's measurements line */}
+            {chartData.length>1 && (
+              <path d={"M"+chartData.map(m=>`${xScale(ageMonths(m.fecha))},${yScale(chartType==="peso"?m.peso:m.talla)}`).join("L")}
+                fill="none" stroke={C.accent} strokeWidth="2" strokeLinejoin="round"/>
+            )}
+            {/* Dots */}
+            {chartData.map((m,i)=>{
+              const val = chartType==="peso"?m.peso:m.talla;
+              const isEst = !!m.tallaEstimada;
+              return <circle key={i} cx={xScale(ageMonths(m.fecha))} cy={yScale(val)}
+                r={isEst?3:4} fill={isEst?"none":C.accent} stroke={isEst?C.accent:C.bg}
+                strokeWidth={isEst?1.5:1.5} strokeDasharray={isEst?"2,2":"none"} opacity={isEst?0.5:1}/>;
+            })}
+          </svg>
+        )}
+        {/* Legend */}
+        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:4,paddingBottom:4}}>
+          <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:16,height:2,backgroundColor:C.accent,borderRadius:1}}/><span style={{fontSize:10,color:C.muted}}>Ignaciu</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:16,height:1.5,backgroundColor:"#62a8f5",borderRadius:1,opacity:0.5}}/><span style={{fontSize:10,color:C.muted}}>Percentiles OMS</span></div>
+        </div>
+      </div>
+
+      {/* Latest percentile */}
+      {latestPct && latest && (
+        <div style={{backgroundColor:C.surface,borderRadius:12,padding:"12px 16px",marginBottom:14,border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:11,color:C.muted}}>{chartType==="peso"?"Último peso":"Última talla"}</div>
+            <div style={{fontSize:18,fontWeight:900,color:C.text}}>{chartType==="peso"?`${latest.peso} kg`:`${latest.talla} cm`}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{new Date(latest.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:11,color:C.muted}}>Percentil</div>
+            <div style={{fontSize:20,fontWeight:900,color:C.accent}}>{latestPct}</div>
+            <div style={{fontSize:10,color:C.muted}}>OMS {babyInfo.sexo==="F"?"niña":"niño"}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Add button */}
+      <button onClick={()=>setShowForm(true)} style={primaryBtn}>+ Añadir medición</button>
+
+      {/* Add form */}
+      {showForm && (
+        <div style={{backgroundColor:C.elevated,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:900,marginBottom:14,color:C.text}}>Nueva medición</div>
+          <DTPicker label="Fecha" date={fecha} time="" onDate={setFecha} onTime={()=>{}}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+            {[{label:"Peso (kg)",val:peso,set:setPeso,placeholder:"3.5"},{label:"Talla (cm)",val:talla,set:setTalla,placeholder:"52"},{label:"Cabeza (cm)",val:cabeza,set:setCabeza,placeholder:"35"}].map(f=>(
+              <div key={f.label}>
+                <label style={{...UL,marginBottom:4}}>{f.label}</label>
+                <input type="number" step="0.01" value={f.val} onChange={e=>f.set(e.target.value)}
+                  placeholder={f.placeholder} inputMode="decimal"
+                  style={{...tInput,width:"100%",fontSize:16,padding:"10px"}}/>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={saveMedida} disabled={saving||(!peso&&!talla&&!cabeza)} style={{...primaryBtn,flex:1,marginBottom:0}}>
+              {saving?<span className="spin">⏳</span>:"💾 Guardar"}
+            </button>
+            <button onClick={()=>setShowForm(false)} style={{...ghostBtn,flex:"0 0 auto",width:80,marginBottom:0}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Historial */}
+      {sorted.length>0 && (
+        <div style={{backgroundColor:C.surface,borderRadius:14,padding:"12px 16px",border:`1px solid ${C.border}`,marginTop:8}}>
+          <div style={{fontSize:11,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>Historial</div>
+          {[...sorted].reverse().map((m,i)=>{
+            const agM = ageMonths(m.fecha);
+            const wP  = m.peso  ? getPercentile(wTable, agM, m.peso)  : null;
+            const lP  = m.talla ? getPercentile(lTable, agM, m.talla) : null;
+            return (
+              <div key={m.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${C.border}`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:800,color:C.text}}>
+                    {new Date(m.fecha+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"})}
+                    <span style={{fontSize:10,color:C.muted,marginLeft:6}}>{agM<1?`${Math.round(agM*30)}d`:`${agM.toFixed(1)}m`}</span>
+                  </div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}>
+                    {m.peso  && <span>⚖️ {m.peso}kg {wP?<span style={{color:C.accent}}>({wP})</span>:""}</span>}
+                    {m.talla && <span>📏 {m.talla}cm {lP?<span style={{color:C.accent}}>({lP})</span>:""}</span>}
+                    {m.cabeza && <span>🔵 {m.cabeza}cm</span>}
+                  </div>
+                </div>
+                <button onClick={()=>onDeleteMedida(m.id)} style={{border:"none",background:"none",color:C.muted,fontSize:16,cursor:"pointer",padding:"4px 8px"}}>✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Edit baby info */}
+      <button onClick={()=>setShowSetup(true)} style={{...ghostBtn,marginTop:14,fontSize:11}}>
+        ⚙️ Cambiar fecha de nacimiento o sexo
+      </button>
+    </div>
+  );
+}
+
 // ─── LINTERNA VIEW ─────────────────────────────────────────────────────────────
 function LinternaView({ color, setColor, brightness, setBrightness, active, setActive }) {
   return (
@@ -1651,6 +2015,8 @@ function App() {
     try{localStorage.setItem("lunita_font", String(fontScale));}catch{}
   },[fontScale]);
   const [grabaciones,    setGrabaciones]    = useState([]);
+  const [medidas,        setMedidas]        = useState([]);
+  const [babyInfo,       setBabyInfoState]  = useState(null);
   const [loadingGrab,    setLoadingGrab]    = useState(false);
   const [lightColor,setLC]     = useState(LIGHT_COLORS[0]);
   const [brightness,setBr]     = useState(0.65);
@@ -1669,14 +2035,25 @@ function App() {
   },[]);
 
   const initWith = useCallback(s => {
-    if(s.mode==="local"){ setEntries(loadLocal()); setReady(true); }
-    else {
+    if(s.mode==="local"){
+      setEntries(loadLocal());
+      // Load medidas for local
+      db.collection("lunita_medidas").where("roomCode","==","local").orderBy("fecha","asc").get()
+        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(()=>{});
+      setReady(true);
+    } else {
       unsubRef.current?.();
       const unsub = salaRef(s.roomCode).onSnapshot(snap=>{
-        if(snap.exists) setEntries(snap.data().entries||[]);
+        if(snap.exists){
+          setEntries(snap.data().entries||[]);
+          if(snap.data().babyInfo) setBabyInfoState(snap.data().babyInfo);
+        }
         setReady(true);
       },()=>setReady(true));
       unsubRef.current = unsub;
+      // Load medidas
+      db.collection("lunita_medidas").where("roomCode","==",s.roomCode).orderBy("fecha","asc").get()
+        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(()=>{});
     }
   },[]);
 
@@ -1720,6 +2097,12 @@ function App() {
     }
   };
   const setVol=(id,v)=>{setVolumes(p=>({...p,[id]:v}));if(playing[id])audioRef.current?.setVol(id,v);};
+  const addMedida    = m => setMedidas(p=>[...p,m].sort((a,b)=>a.fecha.localeCompare(b.fecha)));
+  const deleteMedida = async id => {
+    await db.collection("lunita_medidas").doc(id).delete().catch(()=>{});
+    setMedidas(p=>p.filter(m=>m.id!==id));
+  };
+  const handleSetBabyInfo = info => { setBabyInfoState(info); };
   const saveGrabacion = g => {
     setGrabaciones(p => [g, ...p]);
   };
@@ -1784,7 +2167,8 @@ function App() {
         {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)} onReorder={persist}/>}
         {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
         {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current}/>}
-        {tab==="llanto"  &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
+        {tab==="llanto"      &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>
+        }{tab==="crecimiento"&&<CrecimientoView babyInfo={babyInfo} setBabyInfo={handleSetBabyInfo} medidas={medidas} onAddMedida={addMedida} onDeleteMedida={deleteMedida} roomCode={setup?.roomCode}/>}
       </div>
 
       {tab==="registro"&&(
@@ -1792,7 +2176,7 @@ function App() {
       )}
 
       <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {[{id:"registro",label:"Registro",emoji:"📋"},{id:"linterna",label:"Linterna",emoji:"💡"},{id:"sonidos",label:"Sonidos",emoji:"🎵"},{id:"llanto",label:"Llanto",emoji:"🎙️"}].map(t=>(
+        {[{id:"registro",label:"Registro",emoji:"📋"},{id:"crecimiento",label:"Crecer",emoji:"📏"},{id:"linterna",label:"Linterna",emoji:"💡"},{id:"sonidos",label:"Sonidos",emoji:"🎵"},{id:"llanto",label:"Llanto",emoji:"🎙️"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 0 12px",border:"none",background:"none",cursor:"pointer",fontFamily:"inherit"}}>
             <span style={{fontSize:22,filter:tab===t.id?"none":"grayscale(1) opacity(0.45)"}}>{t.emoji}</span>
             <span style={{fontSize:10,fontWeight:800,color:tab===t.id?C.accent:C.muted}}>{t.label}</span>
