@@ -797,19 +797,26 @@ function EditGrabacionModal({ g, onSave, onClose }) {
 
 // ─── ENTRY CARD ────────────────────────────────────────────────────────────────
 function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDragging }) {
-  const ip    = entry.status==="en_curso";
+  const ip           = entry.status==="en_curso";
   const isJeringa    = entry.type==="toma" && entry.breast==="jeringa-dedo";
   const isExtraccion = entry.type==="toma" && entry.breast==="extraccion";
+  const isSueno      = entry.type==="sueno";
   const isDraggable  = entry.type==="panal" || isJeringa || isExtraccion;
-  const emoji = entry.type==="toma"
-    ? (isJeringa ? "🍼" : isExtraccion ? "🥛" : entry.breast==="left" ? "🤱" : "🍼")
-    : ({pis:"💧",caca:"💩",mixto:"🌊"}[entry.diaperType]||"🧷");
-  const detail = entry.type==="toma"
-    ? (isJeringa    ? `Biberón · ${entry.ml||"?"}ml`
-     : isExtraccion ? `Sacaleches ${entry.extBreast==="left"?"izq.":"dch."} · ${entry.ml||"?"}ml`
-     : `${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`)
-    : `${({pis:"Pipí",caca:"Caca",mixto:"Mixto"}[entry.diaperType])}${entry.amount?` · ${entry.amount}`:""}`;
-  const timeLabel = entry.type==="toma" && !isJeringa && !isExtraccion && entry.startTime
+
+  const emoji = isSueno ? "😴"
+    : entry.type==="toma"
+      ? (isJeringa ? "🍼" : isExtraccion ? "🥛" : entry.breast==="left" ? "🤱" : "🍼")
+      : ({pis:"💧",caca:"💩",mixto:"🌊"}[entry.diaperType]||"🧷");
+
+  const detail = isSueno
+    ? `Sueño · ${ip ? "en curso…" : fmtDur(entry.duration)}`
+    : entry.type==="toma"
+      ? (isJeringa    ? `Biberón · ${entry.ml||"?"}ml`
+       : isExtraccion ? `Sacaleches ${entry.extBreast==="left"?"izq.":"dch."} · ${entry.ml||"?"}ml`
+       : `${entry.breast==="left"?"Pecho izq.":"Pecho dch."} · ${ip?"en curso…":fmtDur(entry.duration)}`)
+      : `${({pis:"Pipí",caca:"Caca",mixto:"Mixto"}[entry.diaperType]||"")}${entry.amount?` · ${entry.amount}`:""}`;
+
+  const timeLabel = (isSueno || (entry.type==="toma" && !isJeringa && !isExtraccion)) && entry.startTime
     ? `${fmtDateTime(entry.startDate,entry.startTime)}${entry.endTime?` → ${fmtDateTime(entry.endDate,entry.endTime)}`:""}`
     : (isExtraccion || isJeringa) && entry.startTime ? fmtDateTime(entry.startDate, entry.startTime)
     : entry.type==="panal" && entry.startTime ? fmtDateTime(entry.startDate, entry.startTime)
