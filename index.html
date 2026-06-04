@@ -196,6 +196,12 @@ class AudioEngine {
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────────
 const todayStr   = () => new Date().toISOString().slice(0,10);
+const babyDisplayName = (setup) => {
+  if(!setup) return "";
+  // Use babyName if available, else extract prefix from roomCode
+  const raw = setup.babyName || (setup.roomCode||"").split("-")[0];
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+};
 const nowTimeStr = () => { const d=new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; };
 const hexA       = (hex,a) => { const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 const calcDur    = (sd,st,ed,et) => { if(!sd||!st||!ed||!et)return null; const d=(new Date(`${ed}T${et}`)-new Date(`${sd}T${st}`))/1000; return d>0?Math.round(d):null; };
@@ -354,7 +360,7 @@ function SalaInfoModal({ setup, onClose, onLeave }) {
       <div style={{fontSize:19,fontWeight:900,marginBottom:20,color:C.text}}>👨‍👩‍👧 Sala compartida</div>
       <div style={{backgroundColor:C.elevated,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.border}`,textAlign:"center"}}>
         <div style={{fontSize:12,color:C.muted,marginBottom:4}}>Sala de</div>
-        <div style={{fontSize:22,fontWeight:900,marginBottom:14}}>{setup.babyName}</div>
+        <div style={{fontSize:22,fontWeight:900,marginBottom:14}}>{babyDisplayName(setup)}</div>
         <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Código para compartir</div>
         <div style={{fontSize:30,fontWeight:900,color:C.accent,letterSpacing:3,marginBottom:14}}>{setup.roomCode}</div>
         <button onClick={copy} style={{...bigBtn,justifyContent:"center",backgroundColor:copied?hexA(C.green,0.15):C.surface,borderColor:copied?C.green:C.border,color:copied?C.green:C.text,marginBottom:0,fontSize:13}}>
@@ -791,7 +797,7 @@ function EditGrabacionModal({ g, onSave, onClose }) {
 
 // ─── ENTRY CARD ────────────────────────────────────────────────────────────────
 function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDragging }) {
-  const ip    = entry.type==="toma" && entry.status==="en_curso";
+  const ip    = entry.status==="en_curso";
   const isJeringa    = entry.type==="toma" && entry.breast==="jeringa-dedo";
   const isExtraccion = entry.type==="toma" && entry.breast==="extraccion";
   const isDraggable  = entry.type==="panal" || isJeringa || isExtraccion;
@@ -2039,7 +2045,7 @@ function App() {
       setEntries(loadLocal());
       // Load medidas for local
       db.collection("lunita_medidas").where("roomCode","==","local").orderBy("fecha","asc").get()
-        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(()=>{});
+        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(e=>console.warn("medidas:",e));
       setReady(true);
     } else {
       unsubRef.current?.();
@@ -2053,7 +2059,7 @@ function App() {
       unsubRef.current = unsub;
       // Load medidas
       db.collection("lunita_medidas").where("roomCode","==",s.roomCode).orderBy("fecha","asc").get()
-        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(()=>{});
+        .then(snap=>setMedidas(snap.docs.map(d=>({id:d.id,...d.data()})))).catch(e=>console.warn("medidas:",e));
     }
   },[]);
 
@@ -2138,7 +2144,7 @@ function App() {
           <span style={{fontSize:24}}>🌙</span>
           <div>
             <div style={{fontSize:20,fontWeight:900,letterSpacing:-0.5}}>Lunita</div>
-            <div style={{fontSize:11,color:C.muted}}>{isSala?`Sala de ${setup.babyName}`:"Modo local"}</div>
+            <div style={{fontSize:11,color:C.muted}}>{isSala?`Sala de ${babyDisplayName(setup)}`:"Modo local"}</div>
           </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -2164,7 +2170,7 @@ function App() {
       </div>
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:72}}>
-        {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,setup.babyName)} onImport={()=>setShowImport(true)} onReorder={persist}/>}
+        {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,babyDisplayName(setup))} onImport={()=>setShowImport(true)} onReorder={persist}/>}
         {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
         {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current}/>}
         {tab==="llanto"      &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>
