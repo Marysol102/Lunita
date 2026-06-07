@@ -195,7 +195,12 @@ class AudioEngine {
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────────
-const todayStr   = () => new Date().toISOString().slice(0,10);
+// Local date string (YYYY-MM-DD) using device timezone — not UTC
+const localDateStr = (d) => {
+  const dt = d ? new Date(d) : new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+};
+const todayStr = () => localDateStr();
 const babyDisplayName = (setup) => {
   if(!setup) return "";
   // Use babyName if available, else extract prefix from roomCode
@@ -419,9 +424,9 @@ function ImportModal({ onImport, onClose }) {
 }
 
 // ─── ADD ENTRY MODAL ───────────────────────────────────────────────────────────
-function AddEntryModal({ onSave, onClose }) {
+function AddEntryModal({ onSave, onClose, initialType }) {
   const [step,setStep]=[useState(0)[0],useState(0)[1]];
-  const [s,setS] = useState({step:0,type:null,breast:null,sd:todayStr(),st:"",ed:todayStr(),et:"",diaper:null,amount:null,comment:""});
+  const [s,setS] = useState(initialType==="sueno" ? {step:30,type:"sueno",breast:null,sd:todayStr(),st:"",ed:todayStr(),et:"",diaper:null,amount:null,comment:""} : {step:0,type:null,breast:null,sd:todayStr(),st:"",ed:todayStr(),et:"",diaper:null,amount:null,comment:""});
   const u = (k,v) => setS(p=>({...p,[k]:v}));
   const dur = calcDur(s.sd,s.st,s.ed,s.et);
   const T = text => <div style={{fontSize:19,fontWeight:900,marginBottom:22,color:C.text}}>{text}</div>;
@@ -440,7 +445,6 @@ function AddEntryModal({ onSave, onClose }) {
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",step:1}))}><span style={{fontSize:26}}>🤱</span><div><div style={{fontWeight:800,fontSize:16}}>Toma de pecho</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Lactancia o biberón</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"extraccion",step:21}))}><span style={{fontSize:26}}>🥛</span><div><div style={{fontWeight:800,fontSize:16}}>Extracción con sacaleches</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Teta, fecha/hora y ml</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"toma",breast:"jeringa-dedo",step:20}))}><span style={{fontSize:26}}>🍼</span><div><div style={{fontWeight:800,fontSize:16}}>Biberón</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
-    <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"sueno",step:30}))}><span style={{fontSize:26}}>😴</span><div><div style={{fontWeight:800,fontSize:16}}>Sueño</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar hora de inicio y fin</div></div></button>
     <button style={bigBtn} onClick={()=>setS(p=>({...p,type:"panal",step:10}))}><span style={{fontSize:26}}>🧷</span><div><div style={{fontWeight:800,fontSize:16}}>Cambio de pañal</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar tipo y cantidad</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
   </div></div>);
@@ -860,12 +864,12 @@ function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDra
 }
 
 // ─── REGISTRO VIEW ─────────────────────────────────────────────────────────────
-const getEntryDate = e => e.startDate ? e.startDate : new Date(e.createdAt).toISOString().slice(0,10);
+const getEntryDate = e => e.startDate ? e.startDate : localDateStr(e.createdAt);
 
 const fmtDayLabel = dateStr => {
   const t = todayStr();
   const yest = new Date(); yest.setDate(yest.getDate()-1);
-  const y = yest.toISOString().slice(0,10);
+  const y = localDateStr(yest);
   if(dateStr===t) return "Hoy";
   if(dateStr===y) return "Ayer";
   const d = new Date(dateStr+"T12:00:00");
@@ -1081,7 +1085,7 @@ function StatsModal({ entries, onClose }) {
 
   const dataByDay = dateRange.map(date => {
     const de = entries.filter(e => {
-      const ed = e.startDate || new Date(e.createdAt).toISOString().slice(0,10);
+      const ed = e.startDate || localDateStr(e.createdAt);
       return ed === date;
     });
     const suenoSecs = de.filter(e=>e.type==="sueno"&&e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
@@ -2009,6 +2013,103 @@ function SonidosView({ playing, volumes, onToggle, onVolume, audioEngine }) {
   );
 }
 
+// ─── SUENO VIEW ────────────────────────────────────────────────────────────────
+function SuenoView({ entries, onDelete, onFinalize, onEdit, onAdd }) {
+  const suenoEntries = entries.filter(e => e.type==="sueno");
+  const todayKey = todayStr();
+  const todayS = suenoEntries.filter(e => getEntryDate(e)===todayKey);
+  const totalHoy = todayS.filter(e=>e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
+  const enCurso  = suenoEntries.filter(e=>e.status==="en_curso").length;
+  const maxPeriod = todayS.filter(e=>e.status==="done"&&e.duration).reduce((a,e)=>Math.max(a,e.duration),0);
+
+  return (
+    <div>
+      {/* Stats */}
+      <div style={{padding:"16px 16px 10px"}}>
+        <div style={{display:"flex",gap:10,marginBottom:10}}>
+          {[
+            {label:"Dormido hoy", value:fmtDur(totalHoy)||"0h",    emoji:"😴"},
+            {label:"Períodos",    value:todayS.filter(e=>e.status==="done").length, emoji:"🔢"},
+            {label:"Más largo",   value:fmtDur(maxPeriod)||"—",    emoji:"⭐"},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,backgroundColor:C.surface,borderRadius:14,padding:"10px 8px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:20}}>{s.emoji}</div>
+              <div style={{fontSize:14,fontWeight:900,color:C.accent,lineHeight:1.2}}>{s.value}</div>
+              <div style={{fontSize:9,color:C.muted,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {enCurso>0&&(
+          <div style={{backgroundColor:hexA(C.orange,0.1),borderRadius:12,padding:"10px 14px",border:`1px solid ${hexA(C.orange,0.4)}`,display:"flex",alignItems:"center",gap:8}}>
+            <span>⏱</span><span style={{fontSize:13,fontWeight:700,color:C.orange}}>{enCurso} sueño en curso — pulsa para añadir el fin</span>
+          </div>
+        )}
+      </div>
+
+      {/* Entry list */}
+      {suenoEntries.length===0 ? (
+        <div style={{textAlign:"center",padding:"50px 24px",color:C.muted}}>
+          <div style={{fontSize:52,marginBottom:14}}>😴</div>
+          <div style={{fontSize:17,fontWeight:800,color:C.text}}>Sin registros de sueño</div>
+          <div style={{fontSize:13,marginTop:8,lineHeight:1.6}}>Pulsa <strong style={{color:C.accent}}>+</strong> para añadir el primer sueño</div>
+        </div>
+      ) : (
+        <div style={{paddingBottom:4}}>
+          {suenoEntries.map(e=>(
+            <EntryCard key={e.id} entry={e} onDelete={onDelete} onFinalize={onFinalize} onEdit={onEdit} dragHandleProps={{}} isDragging={false}/>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HERRAMIENTAS VIEW ──────────────────────────────────────────────────────────
+function HerramientasView({ lightColor, setLC, brightness, setBr, lightActive, setLA, playing, volumes, onToggle, onVolume, audioEngine, babyInfo, setBabyInfo, medidas, onAddMedida, onDeleteMedida, roomCode }) {
+  const [tool, setTool] = useState(null); // null | "linterna" | "sonidos" | "crecer"
+
+  if(tool==="linterna") return (
+    <div>
+      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"12px 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>
+    </div>
+  );
+  if(tool==="sonidos") return (
+    <div>
+      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"12px 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <SonidosView playing={playing} volumes={volumes} onToggle={onToggle} onVolume={onVolume} audioEngine={audioEngine}/>
+    </div>
+  );
+  if(tool==="crecer") return (
+    <div>
+      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"12px 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <CrecimientoView babyInfo={babyInfo} setBabyInfo={setBabyInfo} medidas={medidas} onAddMedida={onAddMedida} onDeleteMedida={onDeleteMedida} roomCode={roomCode}/>
+    </div>
+  );
+
+  const tools = [
+    {id:"linterna", label:"Linterna",  emoji:"💡", desc:"Luz de noche"},
+    {id:"sonidos",  label:"Sonidos",   emoji:"🎵", desc:"Ruido blanco y más"},
+    {id:"crecer",   label:"Crecimiento",emoji:"📏", desc:"Peso, talla y percentiles"},
+  ];
+
+  return (
+    <div style={{padding:16}}>
+      <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>Herramientas de apoyo para el día a día</div>
+      {tools.map(t=>(
+        <button key={t.id} onClick={()=>setTool(t.id)} style={{...bigBtn,padding:"18px 16px",marginBottom:14,borderRadius:16}}>
+          <span style={{fontSize:32}}>{t.emoji}</span>
+          <div>
+            <div style={{fontWeight:900,fontSize:17}}>{t.label}</div>
+            <div style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2}}>{t.desc}</div>
+          </div>
+          <span style={{marginLeft:"auto",color:C.muted,fontSize:18}}>›</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── APP ───────────────────────────────────────────────────────────────────────
 function App() {
   const [setup,setSetup]       = useState(null);
@@ -2017,6 +2118,7 @@ function App() {
   const [tab,setTab]           = useState("registro");
   const prevTabRef = useRef(null);
   const [modal,setModal]       = useState(false);
+  const [suenoModal,setSuenoModal] = useState(false);
   const [finalEntry,setFinal]  = useState(null);
   const [editEntry, setEditEntry] = useState(null);
   const [showSala,setShowSala] = useState(false);
@@ -2090,7 +2192,7 @@ function App() {
 
   // Load grabaciones when user opens llanto tab
   useEffect(()=>{
-    if(tab==="llanto" && prevTabRef.current!=="llanto" && setup) {
+    if(tab==="grabaciones" && prevTabRef.current!=="grabaciones" && setup) {
       setLoadingGrab(true);
       loadGrabaciones(setup.roomCode).then(gs=>{
         setGrabaciones(gs);
@@ -2177,19 +2279,18 @@ function App() {
       </div>
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:72}}>
-        {tab==="registro"&&<RegistroView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,babyDisplayName(setup))} onImport={()=>setShowImport(true)} onReorder={persist}/>}
-        {tab==="linterna"&&<LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>}
-        {tab==="sonidos" &&<SonidosView  playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current}/>}
-        {tab==="llanto"      &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>
-        }{tab==="crecimiento"&&<CrecimientoView babyInfo={babyInfo} setBabyInfo={handleSetBabyInfo} medidas={medidas} onAddMedida={addMedida} onDeleteMedida={deleteMedida} roomCode={setup?.roomCode}/>}
+        {tab==="registro"      &&<RegistroView entries={entries.filter(e=>e.type!=="sueno")} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,babyDisplayName(setup))} onImport={()=>setShowImport(true)} onReorder={ne=>persist([...ne,...entries.filter(e=>e.type==="sueno")])}/>}
+        {tab==="sueno"         &&<SuenoView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry}/>}
+        {tab==="grabaciones"   &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
+        {tab==="herramientas"  &&<HerramientasView lightColor={lightColor} setLC={setLC} brightness={brightness} setBr={setBr} lightActive={lightActive} setLA={setLA} playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current} babyInfo={babyInfo} setBabyInfo={handleSetBabyInfo} medidas={medidas} onAddMedida={addMedida} onDeleteMedida={deleteMedida} roomCode={setup?.roomCode}/>}
       </div>
 
-      {tab==="registro"&&(
-        <button onClick={()=>setModal(true)} style={{position:"fixed",bottom:80,right:18,width:54,height:54,borderRadius:27,backgroundColor:C.accent,border:"none",cursor:"pointer",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px ${hexA(C.accent,0.45)}`,zIndex:50,color:"#080b14",fontWeight:900,fontFamily:"inherit"}}>＋</button>
+      {(tab==="registro"||tab==="sueno")&&(
+        <button onClick={()=>tab==="sueno"?setSuenoModal(true):setModal(true)} style={{position:"fixed",bottom:80,right:18,width:54,height:54,borderRadius:27,backgroundColor:C.accent,border:"none",cursor:"pointer",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px ${hexA(C.accent,0.45)}`,zIndex:50,color:"#080b14",fontWeight:900,fontFamily:"inherit"}}>＋</button>
       )}
 
       <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {[{id:"registro",label:"Registro",emoji:"📋"},{id:"crecimiento",label:"Crecer",emoji:"📏"},{id:"linterna",label:"Linterna",emoji:"💡"},{id:"sonidos",label:"Sonidos",emoji:"🎵"},{id:"llanto",label:"Llanto",emoji:"🎙️"}].map(t=>(
+        {[{id:"registro",label:"Registros",emoji:"📋"},{id:"sueno",label:"Sueño",emoji:"😴"},{id:"grabaciones",label:"Grabaciones",emoji:"🎙️"},{id:"herramientas",label:"Herramientas",emoji:"🛠️"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 0 12px",border:"none",background:"none",cursor:"pointer",fontFamily:"inherit"}}>
             <span style={{fontSize:22,filter:tab===t.id?"none":"grayscale(1) opacity(0.45)"}}>{t.emoji}</span>
             <span style={{fontSize:10,fontWeight:800,color:tab===t.id?C.accent:C.muted}}>{t.label}</span>
