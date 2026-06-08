@@ -483,7 +483,7 @@ function AddEntryModal({ onSave, onClose, initialType }) {
 
   if(s.type==="toma"&&s.step===2) return (<div style={OVERLAY}><div className="sheet" style={SHEET}>
     {T("¿Cuándo empezó la toma?")}
-    <button style={nowBtn} onClick={()=>setS(p=>({...p,sd:todayStr(),st:nowTimeStr(),step:3}))}><span style={{fontSize:20}}>🕐</span><div><div style={{fontWeight:800}}>¿Es ahora?</div><div style={{fontSize:12,fontWeight:400}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</div></div></button>
+    <button style={nowBtn} onClick={()=>setS(p=>({...p,sd:todayStr(),st:nowTimeStr()}))}><span style={{fontSize:20}}>🕐</span><div><div style={{fontWeight:800}}>¿Es ahora?</div><div style={{fontSize:12,fontWeight:400}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</div></div></button>
     <div style={{margin:"16px 0 0"}}><DTPicker label="O elige fecha y hora" date={s.sd} time={s.st} onDate={v=>u("sd",v)} onTime={v=>u("st",v)}/></div>
     {s.st&&<><button style={primaryBtn} onClick={()=>u("step",3)}>Siguiente →</button>
     <button style={{...bigBtn,borderColor:C.orange,color:C.orange,backgroundColor:hexA(C.orange,0.1),justifyContent:"center",fontSize:14}} onClick={saveIP}>⏱ Guardar inicio · añadir fin después</button></>}
@@ -2004,7 +2004,7 @@ function SonidosView({ playing, volumes, onToggle, onVolume, audioEngine }) {
 }
 
 // ─── SUENO VIEW ────────────────────────────────────────────────────────────────
-function SuenoView({ entries, onDelete, onFinalize, onEdit, onAdd }) {
+function SuenoView({ entries, onDelete, onFinalize, onEdit, onReorder }) {
   const suenoEntries = entries.filter(e => e.type==="sueno");
   const todayKey = todayStr();
   const todayS = suenoEntries.filter(e => getEntryDate(e)===todayKey);
@@ -2014,6 +2014,9 @@ function SuenoView({ entries, onDelete, onFinalize, onEdit, onAdd }) {
 
   return (
     <div>
+      {dragId&&<div style={{position:"fixed",left:14,right:14,top:ghostY,zIndex:500,height:ghostH,backgroundColor:C.elevated,borderRadius:14,border:`2px solid ${C.orange}`,display:"flex",alignItems:"center",padding:"0 16px",gap:10,pointerEvents:"none",boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+        <span style={{fontSize:20}}>😴</span><span style={{fontSize:14,fontWeight:800,color:C.text}}>{ghostLabel}</span>
+      </div>}
       {/* Stats */}
       <div style={{padding:"16px 16px 10px"}}>
         <div style={{display:"flex",gap:10,marginBottom:10}}>
@@ -2046,7 +2049,12 @@ function SuenoView({ entries, onDelete, onFinalize, onEdit, onAdd }) {
       ) : (
         <div style={{paddingBottom:4}}>
           {suenoEntries.map(e=>(
-            <EntryCard key={e.id} entry={e} onDelete={onDelete} onFinalize={onFinalize} onEdit={onEdit} dragHandleProps={{}} isDragging={false}/>
+            <div key={e.id} ref={el=>{if(el)suenoRefs.current[e.id]=el;else delete suenoRefs.current[e.id];}}>
+                {dragId&&dropIdx===suenoEntries.indexOf(e)&&<div style={{height:3,backgroundColor:C.orange,margin:"0 14px 2px",borderRadius:2}}/>}
+                <EntryCard entry={e} onDelete={onDelete} onFinalize={onFinalize} onEdit={onEdit}
+                  isDragging={dragId===e.id}
+                  dragHandleProps={{onTouchStart:ev=>startLongPress2(ev,e),onTouchMove:cancelLong2,onTouchEnd:cancelLong2}}/>
+              </div>
           ))}
         </div>
       )}
@@ -2270,7 +2278,7 @@ function App() {
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:72}}>
         {tab==="registro"      &&<RegistroView entries={entries.filter(e=>e.type!=="sueno")} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,babyDisplayName(setup))} onImport={()=>setShowImport(true)} onReorder={ne=>persist([...ne,...entries.filter(e=>e.type==="sueno")])}/>}
-        {tab==="sueno"         &&<SuenoView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry}/>}
+        {tab==="sueno"         &&<SuenoView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onReorder={ne=>persist([...entries.filter(e=>e.type!=="sueno"),...ne])}/>}
         {tab==="grabaciones"   &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
         {tab==="herramientas"  &&<HerramientasView lightColor={lightColor} setLC={setLC} brightness={brightness} setBr={setBr} lightActive={lightActive} setLA={setLA} playing={playing} volumes={volumes} onToggle={toggleSound} onVolume={setVol} audioEngine={audioRef.current} babyInfo={babyInfo} setBabyInfo={handleSetBabyInfo} medidas={medidas} onAddMedida={addMedida} onDeleteMedida={deleteMedida} roomCode={setup?.roomCode}/>}
       </div>
