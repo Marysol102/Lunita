@@ -805,7 +805,7 @@ function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDra
   const isJeringa    = entry.type==="toma" && entry.breast==="jeringa-dedo";
   const isExtraccion = entry.type==="toma" && entry.breast==="extraccion";
   const isSueno      = entry.type==="sueno";
-  const isDraggable  = entry.type==="panal" || isJeringa || isExtraccion;
+  const isDraggable  = true;
 
   const emoji = isSueno ? "😴"
     : entry.type==="toma"
@@ -827,26 +827,23 @@ function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDra
     : null;
 
   return (
-    <div style={{
+    <div {...(isDraggable ? dragHandleProps : {})} style={{
       backgroundColor:C.surface, borderRadius:14, padding:"13px 14px",
-      margin:"0 14px 10px", border:`1px solid ${ip?C.orange:C.border}`,
-      opacity: isDragging ? 0.3 : 1, transition:"opacity 0.15s",
+      margin:"0 14px 10px", border:`1px solid ${isDragging?C.accent:ip?C.orange:C.border}`,
+      opacity: isDragging ? 0.35 : 1, transition:"all 0.15s",
+      touchAction: isDraggable ? "none" : "auto",
+      userSelect:"none",
+      cursor: isDraggable ? "grab" : "default",
     }}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
-        {isDraggable && (
-          <div {...dragHandleProps} style={{
-            flexShrink:0, touchAction:"none", cursor:"grab",
-            color:C.muted, fontSize:20, padding:"4px 2px 4px 0",
-            userSelect:"none", lineHeight:1,
-          }}>⠿</div>
-        )}
+
         <div style={{position:"relative",flexShrink:0}}>
           <div style={{fontSize:26,width:38,textAlign:"center"}}>{emoji}</div>
           {ip&&<div style={{position:"absolute",top:-2,right:-2,width:10,height:10,borderRadius:5,backgroundColor:C.orange,animation:"pulse 1.5s ease-in-out infinite"}}/>}
         </div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:14,fontWeight:800}}>{entry.type==="toma"?"Toma":"Pañal"}</span>
+            <span style={{fontSize:14,fontWeight:800}}>{entry.type==="toma"?"Toma":entry.type==="sueno"?"Sueño":"Pañal"}</span>
             {ip&&<span style={{fontSize:10,fontWeight:800,color:C.orange,backgroundColor:hexA(C.orange,0.15),padding:"2px 7px",borderRadius:6}}>EN CURSO</span>}
             {timeLabel&&<span style={{fontSize:12,color:C.muted}}>{timeLabel}</span>}
           </div>
@@ -914,7 +911,7 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
   const offsetYRef  = useRef(0);
 
   const startLongPress = (e, entry) => {
-    if(entry.type !== "panal" && entry.breast !== "jeringa-dedo" && entry.breast !== "extraccion") return;
+
     const touch = e.touches[0];
     longPressRef.current = setTimeout(() => {
       navigator.vibrate?.(30);
@@ -1012,7 +1009,7 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
         </div>}
         {entries.some(e=>e.type==="panal") && !dragId && (
           <div style={{fontSize:11,color:C.muted,marginTop:10,textAlign:"center"}}>
-            Mantén pulsado <strong style={{color:C.text}}>⠿</strong> en un pañal, biberón o extracción para reordenarlo
+            Mantén pulsado cualquier tarjeta para reordenarla
           </div>
         )}
       </div>
@@ -1047,11 +1044,11 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
                     onFinalize={onFinalize}
                     onEdit={onEdit}
                     isDragging={dragId===e.id}
-                    dragHandleProps={(e.type==="panal"||(e.type==="toma"&&(e.breast==="jeringa-dedo"||e.breast==="extraccion"))) ? {
+                    dragHandleProps={{
                       onTouchStart: ev => startLongPress(ev, e),
                       onTouchMove:  cancelLong,
                       onTouchEnd:   cancelLong,
-                    } : {}}
+                    }}
                   />
                 </div>
               );
