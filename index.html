@@ -453,7 +453,6 @@ function AddEntryModal({ onSave, onClose, initialType }) {
     {T("¿Qué pecho?")}
     <button style={selBtn(s.breast==="left")}  onClick={()=>setS(p=>({...p,breast:"left", step:2}))}><span style={{fontSize:24}}>⬅️</span><div><div style={{fontWeight:800}}>Pecho izquierdo</div></div></button>
     <button style={selBtn(s.breast==="right")} onClick={()=>setS(p=>({...p,breast:"right",step:2}))}><span style={{fontSize:24}}>➡️</span><div><div style={{fontWeight:800}}>Pecho derecho</div></div></button>
-    <button style={selBtn(s.breast==="jeringa-dedo")} onClick={()=>setS(p=>({...p,breast:"jeringa-dedo",step:20}))}><span style={{fontSize:24}}>🍼</span><div><div style={{fontWeight:800}}>Biberón</div><div style={{fontSize:12,color:C.muted,fontWeight:400}}>Registrar cantidad en ml</div></div></button>
     <button style={ghostBtn} onClick={onClose}>Cancelar</button>
   </div></div>);
 
@@ -831,7 +830,7 @@ function EntryCard({ entry, onDelete, onFinalize, onEdit, dragHandleProps, isDra
       backgroundColor:C.surface, borderRadius:14, padding:"13px 14px",
       margin:"0 14px 10px", border:`1px solid ${isDragging?C.accent:ip?C.orange:C.border}`,
       opacity: isDragging ? 0.35 : 1, transition:"all 0.15s",
-      touchAction: isDraggable ? "none" : "auto",
+      // touchAction handled by passive scroll detection
       userSelect:"none",
       cursor: isDraggable ? "grab" : "default",
     }}>
@@ -909,12 +908,13 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
   const itemRefs    = useRef({});
   const longPressRef = useRef(null);
   const offsetYRef  = useRef(0);
+  const startTouchRef = useRef({x:0, y:0});
 
   const startLongPress = (e, entry) => {
-
     const touch = e.touches[0];
+    startTouchRef.current = {x: touch.clientX, y: touch.clientY};
     longPressRef.current = setTimeout(() => {
-      navigator.vibrate?.(30);
+      navigator.vibrate?.(25);
       const el = itemRefs.current[entry.id];
       if(!el) return;
       const rect = el.getBoundingClientRect();
@@ -927,7 +927,16 @@ function RegistroView({ entries, onDelete, onFinalize, onEdit, onExport, onImpor
     }, 380);
   };
 
-  const cancelLong = () => clearTimeout(longPressRef.current);
+  const cancelLong = (e) => {
+    if(e?.type==="touchmove") {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startTouchRef.current.x);
+      const dy = Math.abs(touch.clientY - startTouchRef.current.y);
+      if(dx > 8 || dy > 8) clearTimeout(longPressRef.current);
+    } else {
+      clearTimeout(longPressRef.current);
+    }
+  };
 
   // Global touch handlers while dragging
   useEffect(() => {
@@ -2006,11 +2015,92 @@ function SonidosView({ playing, volumes, onToggle, onVolume, audioEngine }) {
 // ─── SUENO VIEW ────────────────────────────────────────────────────────────────
 function SuenoView({ entries, onDelete, onFinalize, onEdit, onReorder }) {
   const suenoEntries = entries.filter(e => e.type==="sueno");
-  const todayKey = todayStr();
-  const todayS = suenoEntries.filter(e => getEntryDate(e)===todayKey);
-  const totalHoy = todayS.filter(e=>e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
-  const enCurso  = suenoEntries.filter(e=>e.status==="en_curso").length;
+  const todayKey  = todayStr();
+  const todayS    = suenoEntries.filter(e => getEntryDate(e)===todayKey);
+  const totalHoy  = todayS.filter(e=>e.status==="done"&&e.duration).reduce((a,e)=>a+e.duration,0);
+  const enCurso   = suenoEntries.filter(e=>e.status==="en_curso").length;
   const maxPeriod = todayS.filter(e=>e.status==="done"&&e.duration).reduce((a,e)=>Math.max(a,e.duration),0);
+
+  // Drag state
+  const [dragId,  setDragId]     = useState(null);
+  const [dropIdx, setDropIdx]    = useState(null);
+  const [ghostY,  setGhostY]     = useState(0);
+  const [ghostH,  setGhostH]     = useState(60);
+  const [ghostLabel, setGhostLabel] = useState("");
+  const itemRefs2   = useRef({});
+  const longRef2    = useRef(null);
+  const offsetY2    = useRef(0);
+  const startTouch2 = useRef({x:0, y:0});
+
+  const startLong2 = (e, entry) => {
+    const touch = e.touches[0];
+    startTouch2.current = {x: touch.clientX, y: touch.clientY};
+    longRef2.current = setTimeout(()=>{
+      navigator.vibrate?.(25);
+      const el = itemRefs2.current[entry.id];
+      if(!el) return;
+      const rect = el.getBoundingClientRect();
+      offsetY2.current = touch.clientY - rect.top;
+      setGhostY(rect.top); setGhostH(rect.height);
+      setGhostLabel(`😴 ${fmtDur(entry.duration)||"en curso"}`);
+      setDragId(entry.id);
+      setDropIdx(suenoEntries.findIndex(en=>en.id===entry.id));
+    }, 380);
+  };
+  const cancelLong2 = (e) => {
+    if(e?.type==="touchmove") {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - startTouch2.current.x);
+      const dy = Math.abs(touch.clientY - startTouch2.current.y);
+      if(dx > 8 || dy > 8) clearTimeout(longRef2.current);
+    } else {
+      clearTimeout(longRef2.current);
+    }
+  };
+
+  // Keep a ref to suenoEntries so effect doesn't re-run on every render
+  const suenoRef = useRef(suenoEntries);
+  useEffect(()=>{ suenoRef.current = suenoEntries; });
+
+  const dropIdxRef = useRef(dropIdx);
+  useEffect(()=>{ dropIdxRef.current = dropIdx; },[dropIdx]);
+
+  useEffect(()=>{
+    if(!dragId) return;
+    const onMove = e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      setGhostY(touch.clientY - offsetY2.current);
+      const list = suenoRef.current;
+      let nd = list.length;
+      for(let i=0;i<list.length;i++){
+        const el = itemRefs2.current[list[i].id];
+        if(!el) continue;
+        const rect = el.getBoundingClientRect();
+        if(touch.clientY < rect.top + rect.height/2){ nd=i; break; }
+      }
+      setDropIdx(nd);
+    };
+    const onEnd = ()=>{
+      const list = suenoRef.current;
+      const di   = dropIdxRef.current;
+      const from = list.findIndex(e=>e.id===dragId);
+      if(from!==-1&&di!==null){
+        let to = di>from ? di-1 : di;
+        if(to!==from){
+          const reordered=[...list];
+          const [item]=reordered.splice(from,1);
+          reordered.splice(to,0,item);
+          onReorder(reordered);
+        }
+      }
+      setDragId(null); setDropIdx(null);
+    };
+    document.addEventListener("touchmove",onMove,{passive:false});
+    document.addEventListener("touchend",onEnd);
+    document.addEventListener("touchcancel",onEnd);
+    return()=>{document.removeEventListener("touchmove",onMove);document.removeEventListener("touchend",onEnd);document.removeEventListener("touchcancel",onEnd);};
+  },[dragId]);
 
   return (
     <div>
@@ -2049,11 +2139,11 @@ function SuenoView({ entries, onDelete, onFinalize, onEdit, onReorder }) {
       ) : (
         <div style={{paddingBottom:4}}>
           {suenoEntries.map(e=>(
-            <div key={e.id} ref={el=>{if(el)suenoRefs.current[e.id]=el;else delete suenoRefs.current[e.id];}}>
-                {dragId&&dropIdx===suenoEntries.indexOf(e)&&<div style={{height:3,backgroundColor:C.orange,margin:"0 14px 2px",borderRadius:2}}/>}
+            <div key={e.id} ref={el=>{if(el)itemRefs2.current[e.id]=el;else delete itemRefs2.current[e.id];}}>
+                {dragId&&dropIdx===suenoEntries.indexOf(e)&&<DropLine/>}
                 <EntryCard entry={e} onDelete={onDelete} onFinalize={onFinalize} onEdit={onEdit}
                   isDragging={dragId===e.id}
-                  dragHandleProps={{onTouchStart:ev=>startLongPress2(ev,e),onTouchMove:cancelLong2,onTouchEnd:cancelLong2}}/>
+                  dragHandleProps={{onTouchStart:ev=>startLong2(ev,e),onTouchMove:cancelLong2,onTouchEnd:cancelLong2}}/>
               </div>
           ))}
         </div>
