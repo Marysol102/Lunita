@@ -37,6 +37,31 @@
     textarea, input { outline: none; }
     @keyframes pulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.45;transform:scale(0.8)} }
     @keyframes fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+    /* iOS PWA Safe Areas */
+    .safe-header {
+      padding-top: max(14px, calc(env(safe-area-inset-top) + 14px)) !important;
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+      padding-bottom: 10px !important;
+    }
+    .safe-content {
+      padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px)) !important;
+    }
+    .safe-nav {
+      padding-bottom: max(0px, env(safe-area-inset-bottom)) !important;
+    }
+    .safe-fab {
+      bottom: max(80px, calc(env(safe-area-inset-bottom) + 80px)) !important;
+    }
+    .safe-back {
+      margin-top: max(12px, calc(env(safe-area-inset-top) + 12px)) !important;
+    }
+    .safe-modal-header {
+      padding-top: max(14px, calc(env(safe-area-inset-top) + 14px)) !important;
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+      padding-bottom: 10px !important;
+    }
     @keyframes spin   { to{transform:rotate(360deg)} }
     .sheet { animation: fadeUp 0.2s ease; }
     .spin  { animation: spin 0.9s linear infinite; display:inline-block; }
@@ -297,7 +322,7 @@ function SetupScreen({ onDone }) {
   const Sub  = t => <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>{t}</div>;
 
   return (
-    <div style={{minHeight:"100vh",backgroundColor:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"calc(env(safe-area-inset-top,24px) + 24px) 24px calc(env(safe-area-inset-bottom,24px) + 24px)",fontFamily:"'Nunito',system-ui,sans-serif",color:C.text}}>
+    <div style={{minHeight:"100vh",backgroundColor:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",paddingTop:"max(24px, calc(env(safe-area-inset-top, 0px) + 24px))",paddingBottom:"max(24px, calc(env(safe-area-inset-bottom, 0px) + 24px))",paddingLeft:"24px",paddingRight:"24px",fontFamily:"'Nunito',system-ui,sans-serif",color:C.text}}>
       <div style={{fontSize:64,marginBottom:16}}>🌙</div>
       <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>Lunita</div>
       <div style={{fontSize:13,color:C.muted,marginBottom:44}}>Herramientas para padres primerizos</div>
@@ -1122,7 +1147,7 @@ function StatsModal({ entries, onClose }) {
     <div style={{position:"fixed",inset:0,backgroundColor:"rgba(0,0,0,0.9)",zIndex:400,display:"flex",flexDirection:"column",fontFamily:"'Nunito',system-ui,sans-serif",color:C.text,overflowY:"auto"}}>
 
       {/* Header */}
-      <div style={{padding:"calc(env(safe-area-inset-top,0px)+14px) 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+      <div className="safe-modal-header" style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
         <div>
           <div style={{fontSize:18,fontWeight:900}}>📊 Estadísticas</div>
           <div style={{fontSize:11,color:C.muted}}>Resumen de registros</div>
@@ -2158,19 +2183,19 @@ function HerramientasView({ lightColor, setLC, brightness, setBr, lightActive, s
 
   if(tool==="linterna") return (
     <div>
-      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"calc(env(safe-area-inset-top, 0px) + 12px) 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <button onClick={()=>setTool(null)} className="safe-back" style={{...bigBtn,marginBottom:0,marginLeft:16,marginRight:16,width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
       <LinternaView color={lightColor} setColor={setLC} brightness={brightness} setBrightness={setBr} active={lightActive} setActive={setLA}/>
     </div>
   );
   if(tool==="sonidos") return (
     <div>
-      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"calc(env(safe-area-inset-top, 0px) + 12px) 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <button onClick={()=>setTool(null)} className="safe-back" style={{...bigBtn,marginBottom:0,marginLeft:16,marginRight:16,width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
       <SonidosView playing={playing} volumes={volumes} onToggle={onToggle} onVolume={onVolume} audioEngine={audioEngine}/>
     </div>
   );
   if(tool==="crecer") return (
     <div>
-      <button onClick={()=>setTool(null)} style={{...bigBtn,margin:"calc(env(safe-area-inset-top, 0px) + 12px) 16px 0",width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
+      <button onClick={()=>setTool(null)} className="safe-back" style={{...bigBtn,marginBottom:0,marginLeft:16,marginRight:16,width:"calc(100% - 32px)",justifyContent:"flex-start",backgroundColor:"transparent",borderColor:"transparent",color:C.muted,fontSize:13}}>← Volver</button>
       <CrecimientoView babyInfo={babyInfo} setBabyInfo={setBabyInfo} medidas={medidas} onAddMedida={onAddMedida} onDeleteMedida={onDeleteMedida} roomCode={roomCode}/>
     </div>
   );
@@ -2336,7 +2361,7 @@ function App() {
     <div style={{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:"'Nunito',system-ui,sans-serif",display:"flex",flexDirection:"column",zoom:fontScale}}>
       <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.45;transform:scale(0.8)}}`}</style>
 
-      <div style={{padding:"calc(env(safe-area-inset-top,0px) + 14px) 16px 10px",borderBottom:`1px solid ${C.border}`,backgroundColor:C.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div className="safe-header" style={{borderBottom:`1px solid ${C.border}`,backgroundColor:C.bg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:24}}>🌙</span>
           <div>
@@ -2366,7 +2391,7 @@ function App() {
         </div>
       </div>
 
-      <div style={{flex:1,overflowY:"auto",paddingBottom:"calc(72px + env(safe-area-inset-bottom, 0px))"}}>
+      <div className="safe-content" style={{flex:1,overflowY:"auto"}}>
         {tab==="registro"      &&<RegistroView entries={entries.filter(e=>e.type!=="sueno")} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onExport={()=>exportJSON(entries,babyDisplayName(setup))} onImport={()=>setShowImport(true)} onReorder={ne=>persist([...ne,...entries.filter(e=>e.type==="sueno")])}/>}
         {tab==="sueno"         &&<SuenoView entries={entries} onDelete={delEntry} onFinalize={setFinal} onEdit={setEditEntry} onReorder={ne=>persist([...entries.filter(e=>e.type!=="sueno"),...ne])}/>}
         {tab==="grabaciones"   &&<LlantoView roomCode={setup?.roomCode} onSaveGrabacion={saveGrabacion} onDeleteGrabacion={removeGrabacion} onUpdateGrabacion={updateGrabacion} grabaciones={grabaciones} loading={loadingGrab}/>}
@@ -2374,10 +2399,10 @@ function App() {
       </div>
 
       {(tab==="registro"||tab==="sueno")&&(
-        <button onClick={()=>tab==="sueno"?setSuenoModal(true):setModal(true)} style={{position:"fixed",bottom:"calc(80px + env(safe-area-inset-bottom, 0px))",right:18,width:54,height:54,borderRadius:27,backgroundColor:C.accent,border:"none",cursor:"pointer",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px ${hexA(C.accent,0.45)}`,zIndex:50,color:"#080b14",fontWeight:900,fontFamily:"inherit"}}>＋</button>
+        <button className="safe-fab" onClick={()=>tab==="sueno"?setSuenoModal(true):setModal(true)} style={{position:"fixed",bottom:80,right:18,width:54,height:54,borderRadius:27,backgroundColor:C.accent,border:"none",cursor:"pointer",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px ${hexA(C.accent,0.45)}`,zIndex:50,color:"#080b14",fontWeight:900,fontFamily:"inherit"}}>＋</button>
       )}
 
-      <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      <div className="safe-nav" style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,display:"flex"}}>
         {[{id:"registro",label:"Registros",emoji:"📋"},{id:"sueno",label:"Sueño",emoji:"😴"},{id:"grabaciones",label:"Grabaciones",emoji:"🎙️"},{id:"herramientas",label:"Herramientas",emoji:"🛠️"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 0 12px",border:"none",background:"none",cursor:"pointer",fontFamily:"inherit",minWidth:0}}>
             <span style={{fontSize:22,filter:tab===t.id?"none":"grayscale(1) opacity(0.45)"}}>{t.emoji}</span>
